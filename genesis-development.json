@@ -1,0 +1,8 @@
+{
+  "nonce": 0,
+  "bits": 4278190111,
+  "coinbase": "1A2QiH4FYc9c4nsNjCMxygg9HKTK9EJWX5",
+  "accounts": {
+    "1A2QiH4FYc9c4nsNjCMxygg9HKTK9EJWX5": {"balance": "10000000"}
+  }
+}
