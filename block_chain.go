@@ -958,19 +958,22 @@ func (bc *BlockChain) ApplyTransaction(
 	if err = useGas(gas, common.CalcTxInitialCost(tx.Data)); err != nil {
 		return nil, err
 	}
+	mVm := vm.NewXVM(stateTree)
 	if TxToAddrNotSet(tx) {
-		mVm := vm.NewXVM(stateTree)
 		if err = mVm.Create(sender.address, tx.Data); err == nil {
 			status = 1
 		}
 	} else {
+        
 		fromaddr, _ := tx.FromAddr()
 		txhash := tx.Hash()
 		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
 		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
 			return nil, err
 		}
-		status = 1
+        if err = mVm.Call(tx.To, tx.Data); err == nil {
+            status = 1
+        }
 	}
 	stateTree.AddNonce(sender.address, 1)
 
