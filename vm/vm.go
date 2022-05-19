@@ -63,6 +63,11 @@ func (vm *xvm) registerBuiltinId(b BuiltinContract) {
 		vm.builtins[bid] = rt
 	}
 }
+
+func (vm *xvm) GetBuiltins() map[uint8]reflect.Type {
+    return vm.builtins
+}
+
 func readXVMCode(code []byte, input []byte) (c []byte, id uint8, err error) {
 	if code == nil && input != nil {
 		code = make([]byte, 3)
