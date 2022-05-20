@@ -18,7 +18,6 @@ pipeline {
                     go version
                     export GOPROXY=https://goproxy.io,direct
                     export GOSUMDB=off
-                    make test
                     """
             }
             post {
