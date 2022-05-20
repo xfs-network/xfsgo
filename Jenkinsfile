@@ -1,9 +1,5 @@
 pipeline {
     agent any
-    environment {
-        IMAGE_REPOSITORY = 'reg.docker.dsyun.io'
-        IMAGE_NAME = 'xfsgo'
-     }
     options {
       gitLabConnection('gitlab')
     }
@@ -29,27 +25,21 @@ pipeline {
                 }
             }
         }
-        stage('BuildAndRelease') {
+        stage('Build') {
             when {
                 branch 'develop'
             }
             steps {
-                script {
-                    updateGitlabCommitStatus name: 'BuildAndRelease', state: 'pending'
-                    dockerImage = docker.build("${IMAGE_REPOSITORY}/${IMAGE_NAME}",
-                     ".")
-                    docker.withRegistry("https://${IMAGE_REPOSITORY}",
-                         "reg.docker.dsyun.io"){
-                            dockerImage.push()
-                    }
-                }
+                sh """
+                make
+                """
             }
             post {
                 success {
-                    updateGitlabCommitStatus name: 'BuildAndRelease', state: 'success'
+                    updateGitlabCommitStatus name: 'Build', state: 'success'
                 }
                 failure {
-                    updateGitlabCommitStatus name: 'BuildAndRelease', state: 'failed'
+                    updateGitlabCommitStatus name: 'Build', state: 'failed'
                 }
 	        }
         }
