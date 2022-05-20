@@ -25,10 +25,13 @@ type token struct {
 }
 
 func (t *token) Create(
+    ctx *ContractContext,
 	name CTypeString,
 	symbol CTypeString,
 	decimals CTypeUint8,
 	totalSupply CTypeUint256) error {
+    caller := ctx.caller
+    logrus.Infof("create %s", caller.B58String())
 	t.Name = name
 	t.Symbol = symbol
 	t.Decimals = decimals
@@ -41,8 +44,10 @@ func (t *token) BuiltinId() uint8 {
 	return 0x01
 }
 
-func (t *token) GetName() CTypeString {
-    logrus.Infof("call get name!!!!")
+func (t *token) GetName(
+    ctx *ContractContext) CTypeString {
+    caller := ctx.caller
+    logrus.Infof("call get name: %s",caller.B58String())
 	return t.Name
 }
 

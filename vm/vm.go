@@ -42,10 +42,12 @@ func NewXVM(st core.StateTree) *xvm {
 	vm.registerBuiltinId(new(token))
 	return vm
 }
-func (vm *xvm) newBuiltinContractExec(id uint8, address common.Address, code []byte) (*builtinContractExec, error) {
+func (vm *xvm) newBuiltinContractExec(
+    id uint8, from, address common.Address, code []byte) (*builtinContractExec, error) {
 	if ct, exists := vm.builtins[id]; exists {
 		return &builtinContractExec{
 			contractT: ct,
+            caller: from,
 			stateTree: vm.stateTree,
 			address:   address,
 			code:      code,
@@ -82,7 +84,7 @@ func readXVMCode(code []byte, input []byte) (c []byte, id uint8, err error) {
 	id = code[2]
 	return
 }
-func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
+func (vm *xvm) Run(fromAddr, addr common.Address, code []byte, input []byte) (err error) {
 	var create = code == nil
 	code, id, err := readXVMCode(code, input)
 	if err != nil && create {
@@ -94,7 +96,8 @@ func (vm *xvm) Run(addr common.Address, code []byte, input []byte) (err error) {
 	}
 	var exec ContractExec
 	if id != 0 {
-		if exec, err = vm.newBuiltinContractExec(id, addr, code); err != nil {
+		if exec, err = vm.newBuiltinContractExec(
+            id, fromAddr, addr, code); err != nil {
 			return
 		}
 	}
@@ -121,15 +124,15 @@ func (vm *xvm) Create(addr common.Address, input []byte) error {
     fromAddressHashBytes := ahash.SHA256(addr[:])
     fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
 	caddr := crypto.CreateAddress(fromAddressHash, nonce)
-	if err := vm.Run(caddr, nil, input); err != nil {
+	if err := vm.Run(addr, caddr, nil, input); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (vm *xvm) Call(address common.Address, input []byte) error {
+func (vm *xvm) Call(from, address common.Address, input []byte) error {
 	code := vm.stateTree.GetCode(address)
-	if err := vm.Run(address, code, input); err != nil {
+	if err := vm.Run(from, address, code, input); err != nil {
 		return err
 	}
 	return nil
@@ -141,7 +144,8 @@ func (vm *xvm) GetBuiltinContract(address common.Address) (c interface{}, err er
 		return
 	}
 	var exec *builtinContractExec
-	if exec, err = vm.newBuiltinContractExec(id, address, code); err != nil {
+	if exec, err = vm.newBuiltinContractExec(
+        id, common.Address{}, address, code); err != nil {
 		return
 	}
 	c, _, err = exec.MakeBuiltinContract()

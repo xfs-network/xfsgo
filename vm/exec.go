@@ -30,6 +30,7 @@ type ContractExec interface {
 type builtinContractExec struct {
 	code      []byte
 	stateTree core.StateTree
+    caller common.Address
 	address   common.Address
 	contractT reflect.Type
 	resultBuf Buffer
@@ -61,15 +62,23 @@ func (ce *builtinContractExec) buildContract() (bc BuiltinContract, err error) {
 	}
 	return
 }
+func (ce *builtinContractExec) buildContext() *ContractContext {
+    c := &ContractContext{}
+    c.caller = ce.caller
+    return c
+}
 func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input []byte) error {
 	buf := NewBuffer(input)
 	mType := fn.Type
 	n := mType.NumIn()
 
 	var args = make([]reflect.Value, 0)
-	for i := 1; i < n; i++ {
+	for i := 0; i < n; i++ {
 		parameterType := mType.In(i)
 		switch parameterType {
+        case reflect.TypeOf(&ContractContext{}):
+            ctx := ce.buildContext()
+            args = append(args, reflect.ValueOf(ctx))
 		case reflect.TypeOf(CTypeString{}):
 			ssize, err := buf.ReadUint32()
 			if err != nil {
@@ -228,7 +237,5 @@ func (ce *builtinContractExec) MakeBuiltinContract() (BuiltinContract, []*stv, e
 	if err := ce.setupContract(cv.Interface(), stvs); err != nil {
 		return nil, nil, err
 	}
-	bc := cv.Interface().(ContractHelper)
-	_ = bc
 	return cv.Interface().(BuiltinContract), stvs, nil
 }

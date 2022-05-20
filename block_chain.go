@@ -971,7 +971,7 @@ func (bc *BlockChain) ApplyTransaction(
 		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
 			return nil, err
 		}
-        if err = mVm.Call(tx.To, tx.Data); err == nil {
+        if err = mVm.Call(sender.address, tx.To, tx.Data); err == nil {
             status = 1
         }else {
             logrus.Infof("exec err: %s", err)

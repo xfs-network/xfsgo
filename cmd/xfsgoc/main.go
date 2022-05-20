@@ -114,15 +114,19 @@ func parseMethodArgs(m reflect.Method) (int, []*ArgObj) {
     mt := m.Type
     argc := mt.NumIn()
     argc = argc - 1
-    argobjs := make([]*ArgObj, argc)
+    argobjs := make([]*ArgObj, 0)
     for i := 1; i < argc + 1; i++ {
         argItem := mt.In(i)
         argTypeName := argItem.Name()
-        
+        switch argItem {
+        case reflect.TypeOf(&vm.ContractContext{}):
+            argc -= 1
+            continue
+        }
         argObj := &ArgObj{
             Type: argTypeName,
         }
-        argobjs[i-1] = argObj
+        argobjs = append(argobjs, argObj)
     }
     return argc, argobjs
 }
