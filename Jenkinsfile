@@ -25,41 +25,23 @@ pipeline {
                 }
             }
         }
-        stage('Build') {
+        stage('BuildAndInstall') {
             when {
                 branch 'develop'
             }
             steps {
-                updateGitlabCommitStatus name: 'Build', state: 'pending'
+                updateGitlabCommitStatus name: 'BuildAndInstall', state: 'pending'
                 sh """
                 make
+                cp ./xfsgo /opt/xfsgo/bin
                 """
             }
             post {
                 success {
-                    updateGitlabCommitStatus name: 'Build', state: 'success'
+                    updateGitlabCommitStatus name: 'BuildAndInstall', state: 'success'
                 }
                 failure {
-                    updateGitlabCommitStatus name: 'Build', state: 'failed'
-                }
-	        }
-        }
-        stage('Install') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                updateGitlabCommitStatus name: 'Install', state: 'pending'
-                sh """
-                cp ./xfsgo /opt/xfsgo/
-                """
-            }
-            post {
-                success {
-                    updateGitlabCommitStatus name: 'Install', state: 'success'
-                }
-                failure {
-                    updateGitlabCommitStatus name: 'Install', state: 'failed'
+                    updateGitlabCommitStatus name: 'BuildAndInstall', state: 'failed'
                 }
 	        }
         }
