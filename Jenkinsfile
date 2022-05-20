@@ -30,6 +30,7 @@ pipeline {
                 branch 'develop'
             }
             steps {
+                updateGitlabCommitStatus name: 'Build', state: 'pending'
                 sh """
                 make
                 """
@@ -40,6 +41,25 @@ pipeline {
                 }
                 failure {
                     updateGitlabCommitStatus name: 'Build', state: 'failed'
+                }
+	        }
+        }
+        stage('Install') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                updateGitlabCommitStatus name: 'Install', state: 'pending'
+                sh """
+                cp ./xfsgo /opt/xfsgo/
+                """
+            }
+            post {
+                success {
+                    updateGitlabCommitStatus name: 'Install', state: 'success'
+                }
+                failure {
+                    updateGitlabCommitStatus name: 'Install', state: 'failed'
                 }
 	        }
         }
