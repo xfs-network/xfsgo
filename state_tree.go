@@ -312,10 +312,11 @@ func (st *StateTree) GetStateObj(addr common.Address) *StateObj {
 	hash := ahash.SHA256(addr.Bytes())
 	if val, has := st.merkleTree.Get(hash); has {
 		obj := &StateObj{}
-        obj.db = st.treeDB
 		if err := rawencode.Decode(val, obj); err != nil {
 			return nil
 		}
+        obj.db = st.treeDB
+        obj.cacheStorage = make(map[[32]byte][]byte)
 		obj.merkleTree = st.merkleTree
 		st.objs[addr] = obj
         

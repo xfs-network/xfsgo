@@ -11,8 +11,6 @@ import (
 	"xfsgo/common"
 	"xfsgo/common/ahash"
 	"xfsgo/core"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -111,9 +109,7 @@ func (ce *builtinContractExec) updateContractState(stvs []*stv) (err error) {
 		if err != nil {
 			return err
 		}
-        logrus.Infof("set state: %s, %s, %x, %s", ce.address.B58String(), st.Name ,st.nameHash, string(jb))
 		ce.stateTree.SetState(ce.address, st.nameHash, jb)
-		//fmt.Printf("name: %s, hash: %x, type: %v, val: %s\n", st.Name, st.nameHash[:], st.Type, string(jb))
 	}
 	return
 }
@@ -157,12 +153,17 @@ func readCallMethod(r io.Reader) (m common.Hash, e error) {
 	copy(m[:], hashdata[:])
 	return
 }
-func (ce *builtinContractExec) exec(input []byte) error {
+func (ce *builtinContractExec) exec(input []byte, create bool) error {
 	bc, stvs, err := ce.MakeBuiltinContract()
 	if err != nil {
 		return err
 	}
-	buf := bytes.NewBuffer(input)
+    var buf *bytes.Buffer
+    if create {
+        buf = bytes.NewBuffer(input)
+    }else {
+        buf = bytes.NewBuffer(input[3:])
+    }
 	fn, err := readCallMethod(buf)
 	if err != nil {
 		return err
@@ -170,11 +171,11 @@ func (ce *builtinContractExec) exec(input []byte) error {
 	return ce.callFn(bc, stvs, fn, buf.Bytes())
 }
 func (ce *builtinContractExec) Call(input []byte) error {
-	return ce.exec(input)
+	return ce.exec(input, false)
 }
 
 func (ce *builtinContractExec) Create(input []byte) error {
-	return ce.exec(input)
+	return ce.exec(input, true)
 }
 
 func (ce *builtinContractExec) findContractStorageValue(cve reflect.Value) []*stv {

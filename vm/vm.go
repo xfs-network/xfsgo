@@ -8,8 +8,6 @@ import (
 	"xfsgo/common/ahash"
 	"xfsgo/core"
 	"xfsgo/crypto"
-
-	"github.com/sirupsen/logrus"
 )
 
 type VM interface {
@@ -130,7 +128,6 @@ func (vm *xvm) Create(addr common.Address, input []byte) error {
 }
 
 func (vm *xvm) Call(address common.Address, input []byte) error {
-    logrus.Infof("[XVM] call input: 0x%x, from:%s", input, address.B58String())
 	code := vm.stateTree.GetCode(address)
 	if err := vm.Run(address, code, input); err != nil {
 		return err

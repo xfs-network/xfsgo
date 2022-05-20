@@ -973,6 +973,8 @@ func (bc *BlockChain) ApplyTransaction(
 		}
         if err = mVm.Call(tx.To, tx.Data); err == nil {
             status = 1
+        }else {
+            logrus.Infof("exec err: %s", err)
         }
 	}
 	stateTree.AddNonce(sender.address, 1)
