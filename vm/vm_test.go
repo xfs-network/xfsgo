@@ -126,23 +126,6 @@ func TestXvm_Create(t *testing.T) {
 	if err := vm.Create(addr, inputBuf.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	nonce2 := vm.stateTree.GetNonce(addr)
-	c2addr := crypto.CreateAddress(addr.Hash(), nonce2)
-	bc, err := vm.GetBuiltinContract(c2addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tc, ok := bc.(*token)
-	if !ok {
-		t.Fatalf("cover token contract err")
-	}
-	gotobj := testToken{
-		name:        tc.GetName(),
-		symbol:      tc.GetSymbol(),
-		decimals:    tc.GetDecimals(),
-		totalSupply: tc.GetTotalSupply(),
-	}
-	assert.Equal(t, gotobj, testACToken)
 }
 
 func TestXvm_Run(t *testing.T) {

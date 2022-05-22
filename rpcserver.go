@@ -156,7 +156,11 @@ func (s *service) callMethod(mtype *methodType, params interface{}) (interface{}
 				return nil, NewRPCError(-32602, "Invalid params")
 			}
 			for i := 0; i < argv.NumField(); i++ {
-				argv.Field(i).Set(reflect.ValueOf(paramsArr[i]))
+				if paramsArr[i] == nil {
+					continue
+				}
+				paramsvalue := reflect.ValueOf(paramsArr[i])
+				argv.Field(i).Set(paramsvalue)
 			}
 		case reflect.Map:
 			paramsMap := params.(map[string]interface{})

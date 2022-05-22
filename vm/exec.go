@@ -30,10 +30,10 @@ type ContractExec interface {
 type builtinContractExec struct {
 	code      []byte
 	stateTree core.StateTree
-    caller common.Address
+	caller    common.Address
 	address   common.Address
 	contractT reflect.Type
-	resultBuf Buffer
+	resultBuf *bytes.Buffer
 }
 
 type stv struct {
@@ -63,9 +63,9 @@ func (ce *builtinContractExec) buildContract() (bc BuiltinContract, err error) {
 	return
 }
 func (ce *builtinContractExec) buildContext() *ContractContext {
-    c := &ContractContext{}
-    c.caller = ce.caller
-    return c
+	c := &ContractContext{}
+	c.caller = ce.caller
+	return c
 }
 func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input []byte) error {
 	buf := NewBuffer(input)
@@ -76,9 +76,9 @@ func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input 
 	for i := 0; i < n; i++ {
 		parameterType := mType.In(i)
 		switch parameterType {
-        case reflect.TypeOf(&ContractContext{}):
-            ctx := ce.buildContext()
-            args = append(args, reflect.ValueOf(ctx))
+		case reflect.TypeOf(&ContractContext{}):
+			ctx := ce.buildContext()
+			args = append(args, reflect.ValueOf(ctx))
 		case reflect.TypeOf(CTypeString{}):
 			ssize, err := buf.ReadUint32()
 			if err != nil {
@@ -122,7 +122,7 @@ func (ce *builtinContractExec) updateContractState(stvs []*stv) (err error) {
 	}
 	return
 }
-func (ce *builtinContractExec) callFn(c BuiltinContract, stvs []*stv, fn common.Hash, input []byte) (err error) {
+func (ce *builtinContractExec) callFn(c BuiltinContract, stvs []*stv, fn common.Hash, input []byte, justReturn bool) (err error) {
 	cv := reflect.ValueOf(c)
 	findMethod := func(hash common.Hash) (reflect.Method, reflect.Value, bool) {
 		for i := 0; i < ce.contractT.NumMethod(); i++ {
@@ -141,6 +141,9 @@ func (ce *builtinContractExec) callFn(c BuiltinContract, stvs []*stv, fn common.
 	}
 	if m, mv, ok := findMethod(fn); ok {
 		if err = ce.call(m, mv, input); err != nil {
+			return
+		}
+		if justReturn {
 			return
 		}
 		if err = ce.updateContractState(stvs); err != nil {
@@ -167,20 +170,38 @@ func (ce *builtinContractExec) exec(input []byte, create bool) error {
 	if err != nil {
 		return err
 	}
-    var buf *bytes.Buffer
-    if create {
-        buf = bytes.NewBuffer(input)
-    }else {
-        buf = bytes.NewBuffer(input[3:])
-    }
+	var buf *bytes.Buffer
+	if create {
+		buf = bytes.NewBuffer(input)
+	} else {
+		buf = bytes.NewBuffer(input[3:])
+	}
 	fn, err := readCallMethod(buf)
 	if err != nil {
 		return err
 	}
-	return ce.callFn(bc, stvs, fn, buf.Bytes())
+	return ce.callFn(bc, stvs, fn, buf.Bytes(), false)
 }
 func (ce *builtinContractExec) Call(input []byte) error {
 	return ce.exec(input, false)
+}
+
+func (ce *builtinContractExec) CallReturn(input []byte, out *[]byte) error {
+	bc, stvs, err := ce.MakeBuiltinContract()
+	if err != nil {
+		return err
+	}
+	buf := bytes.NewBuffer(input)
+	fn, err := readCallMethod(buf)
+	if err != nil {
+		return err
+	}
+	if err = ce.callFn(bc, stvs, fn, buf.Bytes(), true); err != nil {
+		return err
+	}
+	outs := ce.resultBuf.Bytes()
+	*out = outs
+	return nil
 }
 
 func (ce *builtinContractExec) Create(input []byte) error {

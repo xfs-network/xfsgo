@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"reflect"
@@ -11,9 +12,10 @@ import (
 )
 
 type VM interface {
-	Run(common.Address, []byte, []byte) error
+	Run(common.Address, common.Address, []byte, []byte) error
 	Create(common.Address, []byte) error
-	Call(common.Address, []byte) error
+	Call(common.Address, common.Address, []byte) error
+	CallReturn(common.Address, common.Address, []byte, []byte) error
 }
 
 const (
@@ -30,28 +32,26 @@ var (
 type xvm struct {
 	stateTree core.StateTree
 	builtins  map[uint8]reflect.Type
-	returnBuf Buffer
 }
 
 func NewXVM(st core.StateTree) *xvm {
 	vm := &xvm{
 		stateTree: st,
 		builtins:  make(map[uint8]reflect.Type),
-		returnBuf: NewBuffer(nil),
 	}
 	vm.registerBuiltinId(new(token))
 	return vm
 }
 func (vm *xvm) newBuiltinContractExec(
-    id uint8, from, address common.Address, code []byte) (*builtinContractExec, error) {
+	id uint8, from, address common.Address, code []byte) (*builtinContractExec, error) {
 	if ct, exists := vm.builtins[id]; exists {
 		return &builtinContractExec{
 			contractT: ct,
-            caller: from,
+			caller:    from,
 			stateTree: vm.stateTree,
 			address:   address,
 			code:      code,
-			resultBuf: NewBuffer(nil),
+			resultBuf: bytes.NewBuffer(nil),
 		}, nil
 	}
 	return nil, errUnknownContractId
@@ -65,7 +65,7 @@ func (vm *xvm) registerBuiltinId(b BuiltinContract) {
 }
 
 func (vm *xvm) GetBuiltins() map[uint8]reflect.Type {
-    return vm.builtins
+	return vm.builtins
 }
 
 func readXVMCode(code []byte, input []byte) (c []byte, id uint8, err error) {
@@ -97,7 +97,7 @@ func (vm *xvm) Run(fromAddr, addr common.Address, code []byte, input []byte) (er
 	var exec ContractExec
 	if id != 0 {
 		if exec, err = vm.newBuiltinContractExec(
-            id, fromAddr, addr, code); err != nil {
+			id, fromAddr, addr, code); err != nil {
 			return
 		}
 	}
@@ -121,8 +121,8 @@ func (vm *xvm) Run(fromAddr, addr common.Address, code []byte, input []byte) (er
 }
 func (vm *xvm) Create(addr common.Address, input []byte) error {
 	nonce := vm.stateTree.GetNonce(addr)
-    fromAddressHashBytes := ahash.SHA256(addr[:])
-    fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
+	fromAddressHashBytes := ahash.SHA256(addr[:])
+	fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
 	caddr := crypto.CreateAddress(fromAddressHash, nonce)
 	if err := vm.Run(addr, caddr, nil, input); err != nil {
 		return err
@@ -137,6 +137,21 @@ func (vm *xvm) Call(from, address common.Address, input []byte) error {
 	}
 	return nil
 }
+func (vm *xvm) CallReturn(from, to common.Address, input []byte, result *[]byte) error {
+	code := vm.stateTree.GetCode(to)
+	data, id, err := readXVMCode(code, input)
+	if err != nil {
+		return err
+	}
+	exec, err := vm.newBuiltinContractExec(id, from, to, data)
+	if err != nil {
+		return err
+	}
+	if len(input)-3 < 0 {
+		return errors.New("non standard code")
+	}
+	return exec.CallReturn(input[3:], result)
+}
 func (vm *xvm) GetBuiltinContract(address common.Address) (c interface{}, err error) {
 	code := vm.stateTree.GetCode(address)
 	code, id, err := readXVMCode(code, nil)
@@ -145,7 +160,7 @@ func (vm *xvm) GetBuiltinContract(address common.Address) (c interface{}, err er
 	}
 	var exec *builtinContractExec
 	if exec, err = vm.newBuiltinContractExec(
-        id, common.Address{}, address, code); err != nil {
+		id, common.Address{}, address, code); err != nil {
 		return
 	}
 	c, _, err = exec.MakeBuiltinContract()

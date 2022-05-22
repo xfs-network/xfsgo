@@ -18,6 +18,7 @@ package node
 
 import (
 	"crypto/ecdsa"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"log"
 	"os"
@@ -32,8 +33,6 @@ import (
 	"xfsgo/p2p/discover"
 	"xfsgo/p2p/nat"
 	"xfsgo/storage/badger"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Node is a container on which services can be registered.
@@ -142,15 +141,9 @@ func (n *Node) RegisterBackend(
 	netAPIHandler := &api.NetAPIHandler{
 		NetServer: n.P2PServer(),
 	}
-	tokenAPIHandler := &api.TokenApiHandler{
-		StateDb:       stateDb,
-		BlockChain:    bc,
-		TxPendingPool: txPool,
-		Wallet:        wallet,
-	}
-	nftAPIHandler := &api.NFTApiHandler{
-		BlockChain:    bc,
-		TxPendingPool: txPool,
+	vmHandler := &api.VMHandler{
+		Chain:   bc,
+		StateDb: stateDb,
 	}
 	if err := n.rpcServer.RegisterName("Chain", chainApiHandler); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
@@ -177,11 +170,7 @@ func (n *Node) RegisterBackend(
 		log.Fatalf("RPC service register error: %s", err)
 		return err
 	}
-	if err := n.rpcServer.RegisterName("Token", tokenAPIHandler); err != nil {
-		log.Fatalf("RPC service register error: %s", err)
-		return err
-	}
-	if err := n.rpcServer.RegisterName("NFT", nftAPIHandler); err != nil {
+	if err := n.rpcServer.RegisterName("VM", vmHandler); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
 		return err
 	}
