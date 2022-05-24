@@ -193,6 +193,27 @@ func (b *buffer) ReadUint256() (n CTypeUint256, e error) {
 	copy(n[:], buf[:m])
 	return
 }
+
+func (b *buffer) Read(n []byte) (e error) {
+	var r []row
+	var m int
+	r, m, e = b.ReadRows(len(n))
+	if e != nil {
+		return
+	}
+	buf := make([]byte, len(r)*rowlen)
+	for i := 0; i < len(r); i++ {
+		start := i * rowlen
+		end := (i * rowlen) + rowlen
+		copy(buf[start:end], r[i][:])
+	}
+	if len(buf) > rowlen {
+		copy(n[:], buf[:len(buf)-m])
+		return
+	}
+	copy(n[:], buf[:m])
+	return
+}
 func (b *buffer) ReadString(size int) (n CTypeString, e error) {
 	var r []row
 	var m int

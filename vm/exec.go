@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,13 +45,21 @@ type stv struct {
 
 func (ce *builtinContractExec) goReturn(vs []reflect.Value) error {
 	for i := 0; i < len(vs); i++ {
-		if vs[i].IsNil() {
-			continue
+		vt := vs[i].Kind()
+		if vt == reflect.Array {
+			vl := vs[i].Len()
+			for j := 0; j < vl; j++ {
+				vv := vs[i].Index(j)
+				vbuf := make([]byte, 8)
+				binary.LittleEndian.PutUint64(vbuf, vv.Uint())
+				ce.resultBuf.WriteByte(vbuf[0])
+			}
+		} else if vt == reflect.Slice {
+			if err, ok := vs[i].Interface().(error); ok {
+				return err
+			}
+			_, _ = ce.resultBuf.Write(vs[i].Bytes())
 		}
-		if err, ok := vs[i].Interface().(error); ok {
-			return err
-		}
-		_, _ = ce.resultBuf.Write(vs[i].Bytes())
 	}
 	return nil
 }
@@ -101,6 +110,13 @@ func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input 
 				return err
 			}
 			args = append(args, reflect.ValueOf(m))
+		case reflect.TypeOf(CTypeAddress{}):
+			addr := CTypeAddress{}
+			err := buf.Read(addr[:])
+			if err != nil && err != io.EOF {
+				return err
+			}
+			args = append(args, reflect.ValueOf(addr))
 		}
 	}
 	r := fnv.Call(args)
@@ -233,21 +249,26 @@ func (ce *builtinContractExec) findContractStorageValue(cve reflect.Value) []*st
 func (ce *builtinContractExec) setupContract(c interface{}, stvs []*stv) (err error) {
 	var buf strings.Builder
 	buf.WriteString("{")
+	first := true
 	for i := 0; i < len(stvs); i++ {
 		st := stvs[i]
 		data := ce.stateTree.GetStateValue(ce.address, st.nameHash)
 		if data == nil {
 			continue
 		}
+		if first {
+			first = false
+		} else {
+			buf.WriteString(",")
+		}
 		prefix := fmt.Sprintf("\"%s\":", st.Name)
 		buf.WriteString(prefix)
 		buf.Write(data)
-		if i < len(stvs)-1 {
-			buf.WriteString(",")
-		}
 	}
+
 	buf.WriteString("}")
 	bs := buf.String()
+
 	err = json.Unmarshal([]byte(bs), &c)
 	return
 }

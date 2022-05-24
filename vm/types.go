@@ -16,6 +16,11 @@ type CTypeUint256 [32]byte
 type CTypeString []byte
 type CTypeAddress [25]byte
 
+var (
+	CBoolTrue  = CTypeBool{1}
+	CBoolFalse = CTypeBool{0}
+)
+
 func (t CTypeUint8) Uint8() uint8 {
 	return t[0]
 }
