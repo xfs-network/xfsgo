@@ -91,7 +91,7 @@ func (t *nftoken) isApprovedOrOwner(spender CTypeAddress, tokenId CTypeUint256) 
 	}
 	owner := t.OwnerOf(tokenId)
 	if !assertAddress(spender, owner) {
-		if t.isApprovedForAll(owner, spender) == CBoolFalse {
+		if t.IsApprovedForAll(owner, spender) == CBoolFalse {
 			approved := t.GetApproved(tokenId)
 			if !assertAddress(approved, spender) {
 				return false
@@ -143,7 +143,7 @@ func (t *nftoken) Approve(ctx *ContractContext, to CTypeAddress, tokenId CTypeUi
 	owner := t.OwnerOf(tokenId)
 	caller := NewAddress(ctx.caller)
 	if !assertAddress(caller, owner) {
-		if t.isApprovedForAll(owner, caller) != CBoolTrue {
+		if t.IsApprovedForAll(owner, caller) != CBoolTrue {
 			return CBoolFalse
 		}
 	}
@@ -178,7 +178,7 @@ func (t *nftoken) SetApprovalForAll(ctx *ContractContext, operator CTypeAddress,
 	return CBoolTrue
 }
 
-func (t *nftoken) isApprovedForAll(owner, spender CTypeAddress) CTypeBool {
+func (t *nftoken) IsApprovedForAll(owner, spender CTypeAddress) CTypeBool {
 	if !requireAddress(owner) {
 		return CBoolFalse
 	}
