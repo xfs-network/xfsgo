@@ -2,7 +2,6 @@ package vm
 
 import (
 	"bytes"
-	"github.com/sirupsen/logrus"
 	"math/big"
 )
 
@@ -73,20 +72,19 @@ func (t *token) GetTotalSupply() CTypeUint256 {
 }
 func (t *token) Mint(ctx *ContractContext, address CTypeAddress, amount CTypeUint256) CTypeBool {
 	if !assertAddress(NewAddress(ctx.caller), t.Owner) {
-		return CTypeBool{0}
+		return CBoolFalse
 	}
 	if !requireAddress(address) {
-		return CTypeBool{0}
+		return CBoolFalse
 	}
-	oldTotalSupply := new(big.Int).SetBytes(t.TotalSupply[:])
-	amountValue := new(big.Int).SetBytes(amount[:])
-	newTotalSupply := new(big.Int).Add(oldTotalSupply, amountValue)
+	newTotalSupply := new(big.Int).Add(t.TotalSupply.BigInt(), amount.BigInt())
 	t.TotalSupply = NewUint256(newTotalSupply)
-	return t.Transfer(ctx, address, amount)
+	oldBalance := t.Balances[address]
+	newBalance := new(big.Int).Add(oldBalance.BigInt(), amount.BigInt())
+	t.Balances[address] = NewUint256(newBalance)
+	return CBoolTrue
 }
 func (t *token) BalanceOf(addr CTypeAddress) CTypeUint256 {
-	aa := addr.Address()
-	logrus.Infof("aa: %s", aa.B58String())
 	if v, ok := t.Balances[addr]; ok {
 		return v
 	}
@@ -98,9 +96,7 @@ func (t *token) Transfer(ctx *ContractContext, address CTypeAddress, amount CTyp
 	}
 	caller := NewAddress(ctx.caller)
 	if v, ok := t.Balances[caller]; ok {
-		balance := new(big.Int).SetBytes(v[:])
-		amountValue := new(big.Int).SetBytes(amount[:])
-		residual := new(big.Int).Sub(balance, amountValue)
+		residual := new(big.Int).Sub(v.BigInt(), amount.BigInt())
 		if residual.Sign() < 0 {
 			return CBoolFalse
 		}
@@ -111,23 +107,26 @@ func (t *token) Transfer(ctx *ContractContext, address CTypeAddress, amount CTyp
 		} else {
 			targetBalance = big.NewInt(0)
 		}
-		newBalance := new(big.Int).Add(targetBalance, amountValue)
+		newBalance := new(big.Int).Add(targetBalance, amount.BigInt())
 		t.Balances[address] = NewUint256(newBalance)
 		return CBoolTrue
 	}
 	return CBoolFalse
 }
-func (t *token) TransferFrom(from, to CTypeAddress, amount CTypeUint256) CTypeBool {
+func (t *token) TransferFrom(ctx *ContractContext, from, to CTypeAddress, amount CTypeUint256) CTypeBool {
 	if !requireAddress(from) {
 		return CBoolFalse
 	}
 	if !requireAddress(to) {
 		return CBoolFalse
 	}
+	spender := NewAddress(ctx.caller)
+	allowance := t.Allowance(from, spender)
+	if allowance.BigInt().Cmp(amount.BigInt()) < 0 {
+		return CBoolFalse
+	}
 	if v, ok := t.Balances[from]; ok {
-		balance := new(big.Int).SetBytes(v[:])
-		amountValue := new(big.Int).SetBytes(amount[:])
-		residual := new(big.Int).Sub(balance, amountValue)
+		residual := new(big.Int).Sub(v.BigInt(), amount.BigInt())
 		if residual.Sign() < 0 {
 			return CBoolFalse
 		}
@@ -138,26 +137,31 @@ func (t *token) TransferFrom(from, to CTypeAddress, amount CTypeUint256) CTypeBo
 		} else {
 			targetBalance = big.NewInt(0)
 		}
-		newBalance := new(big.Int).Add(targetBalance, amountValue)
+		newBalance := new(big.Int).Add(targetBalance, amount.BigInt())
 		t.Balances[from] = NewUint256(newBalance)
+		oldAllowance := t.Allowances[from][spender]
+		newAllowance := new(big.Int).Sub(oldAllowance.BigInt(), amount.BigInt())
+		t.Allowances[from][spender] = NewUint256(newAllowance)
 		return CBoolTrue
 	}
 	return CBoolFalse
 }
 func (t *token) Approve(ctx *ContractContext, spender CTypeAddress, amount CTypeUint256) CTypeBool {
+	if !requireAddress(spender) {
+		return CBoolFalse
+	}
 	owner := NewAddress(ctx.caller)
 	if _, exists := t.Allowances[owner][spender]; exists {
 		t.Allowances[owner][spender] = amount
-	} else {
-		t.Allowances[owner] = make(map[CTypeAddress]CTypeUint256)
-		t.Allowances[owner][spender] = amount
+		return CBoolTrue
 	}
-	if _, ok := t.Allowances[owner][spender]; ok {
-	} else {
-		t.Allowances[owner] = make(map[CTypeAddress]CTypeUint256)
+	if _, exists := t.Allowances[owner]; exists {
 		t.Allowances[owner][spender] = amount
+		return CBoolTrue
 	}
-	return CBoolFalse
+	t.Allowances[owner] = make(map[CTypeAddress]CTypeUint256)
+	t.Allowances[owner][spender] = amount
+	return CBoolTrue
 }
 func (t *token) Allowance(owner, spender CTypeAddress) CTypeUint256 {
 	if !requireAddress(owner) {
@@ -166,13 +170,26 @@ func (t *token) Allowance(owner, spender CTypeAddress) CTypeUint256 {
 	if !requireAddress(spender) {
 		return CTypeUint256{}
 	}
-	if v, exists := t.Allowances[owner]; exists {
-		if v == nil {
-			return CTypeUint256{}
-		}
-		if vv, vvexists := v[spender]; vvexists {
-			return vv
-		}
+	if v, exists := t.Allowances[owner][spender]; exists {
+		return v
 	}
 	return CTypeUint256{}
+}
+
+func (t *token) Burn(ctx *ContractContext, address CTypeAddress, amount CTypeUint256) CTypeBool {
+	if !assertAddress(NewAddress(ctx.caller), t.Owner) {
+		return CBoolFalse
+	}
+	if oldBalance, exists := t.Balances[address]; exists {
+		newBalance := new(big.Int).Sub(oldBalance.BigInt(), amount.BigInt())
+		if newBalance.Sign() < 0 {
+			return CBoolFalse
+		}
+		t.Balances[address] = NewUint256(newBalance)
+		oldTotalSupply := t.TotalSupply
+		newTotalSupply := new(big.Int).Sub(oldTotalSupply.BigInt(), amount.BigInt())
+		t.TotalSupply = NewUint256(newTotalSupply)
+		return CBoolTrue
+	}
+	return CBoolFalse
 }

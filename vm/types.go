@@ -161,7 +161,8 @@ func NewUint64(n uint64) (m CTypeUint64) {
 
 func NewUint256(n *big.Int) (m CTypeUint256) {
 	bs := n.Bytes()
-	copy(m[:], bs)
+	r := len(m) - len(bs)
+	copy(m[r:], bs)
 	return
 }
 
