@@ -41,6 +41,7 @@ func NewXVM(st core.StateTree) *xvm {
 		builtins:  make(map[uint8]reflect.Type),
 	}
 	vm.registerBuiltinId(new(token))
+	vm.registerBuiltinId(new(nftoken))
 	return vm
 }
 func (vm *xvm) newBuiltinContractExec(

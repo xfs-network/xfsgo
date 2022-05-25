@@ -1,7 +1,6 @@
 package vm
 
 import (
-	"bytes"
 	"math/big"
 	"testing"
 	"xfsgo/common"
@@ -20,19 +19,6 @@ var (
 	}
 )
 
-func assertCTypeUint256(t *testing.T, got, want CTypeUint256) {
-	gotValue := new(big.Int).SetBytes(got[:])
-	wantValue := new(big.Int).SetBytes(want[:])
-	if wantValue.Cmp(gotValue) != 0 {
-		t.Fatalf("want value: '%s', but got value: '%s'", wantValue, gotValue)
-	}
-}
-func assertCTypeBool(t *testing.T, got, want CTypeBool) {
-	if got != want {
-		t.Fatalf("want value: '%d', but got value: '%d", want, got)
-	}
-}
-
 func TestToken_Create(t *testing.T) {
 	stdToken := new(token)
 	err := stdToken.Create(testCtx,
@@ -44,21 +30,13 @@ func TestToken_Create(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(stdToken.Name, testWantToken.Name) {
-		t.Fatalf("got value: 0x%x, want value: 0x%x", stdToken.Name, testWantToken.Name)
-	}
-	if !bytes.Equal(stdToken.Symbol, testWantToken.Symbol) {
-		t.Fatalf("got value: 0x%x, want value: 0x%x", stdToken.Symbol, testWantToken.Symbol)
-	}
+	assertCTypeString(t, stdToken.Name, testWantToken.Name)
+	assertCTypeString(t, stdToken.Symbol, testWantToken.Symbol)
 	if stdToken.Decimals != testWantToken.Decimals {
 		t.Fatalf("got value: %d, but want value: %d", stdToken.Decimals, testWantToken.Decimals)
 	}
-	if !bytes.Equal(stdToken.TotalSupply[:], testWantToken.TotalSupply[:]) {
-		t.Fatalf("got value: 0x%x, but want value: 0x%x", stdToken.TotalSupply, testWantToken.TotalSupply)
-	}
-	if !bytes.Equal(stdToken.Owner[:], testWantToken.Owner[:]) {
-		t.Fatalf("got value: 0x%x, but want value: 0x%x", stdToken.Owner, testWantToken.Owner)
-	}
+	assertCTypeUint256(t, stdToken.TotalSupply, testWantToken.TotalSupply)
+	assertCTypeAddress(t, stdToken.Owner, testWantToken.Owner)
 	if balance, exists := stdToken.Balances[stdToken.Owner]; exists {
 		assertCTypeUint256(t, balance, stdToken.TotalSupply)
 	} else {

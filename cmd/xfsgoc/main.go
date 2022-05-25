@@ -69,13 +69,17 @@ func errout(err error, t string, a ...interface{}) {
 	}
 }
 
-var isStdtoken bool
-var isBin bool
-var isAbi bool
-var outfile string
+var (
+	isStdToken bool
+	isNFToken  bool
+	isBin      bool
+	isAbi      bool
+	outfile    string
+)
 
 func init() {
-	flag.BoolVar(&isStdtoken, "stdtoken", false, "")
+	flag.BoolVar(&isStdToken, "stdtoken", false, "")
+	flag.BoolVar(&isNFToken, "nftoken", false, "")
 	flag.BoolVar(&isAbi, "abi", false, "")
 	flag.BoolVar(&isBin, "bin", false, "")
 	flag.StringVar(&outfile, "out", "", "")
@@ -189,6 +193,7 @@ func usage() {
 	fmt.Printf(`Usage: %s [options]
 Options:
   -stdtoken          Built in contract like ERC20
+  -nftoken           Built in contract link ERC721
   -abi               Print abi format structure
   -bin               Print contract bin code
   -out <filename>    Set output filepath
@@ -205,27 +210,24 @@ func main() {
 	err = writeUint16(&*binwriter, vm.MagicNumberXVM)
 	errout(err, "Unknown wrong")
 	compiler := NewBuiltinCompiler()
-	// args := flag.Args()
-	// if isStdtoken && (len(args) > 0 || args[0] != "") {
 	out := os.Stdout
 	if outfile != "" {
 		file, err := os.OpenFile(outfile, os.O_WRONLY|os.O_CREATE, 0644)
 		errout(err, "Failed write file")
 		out = file
 	}
-	if isStdtoken && isBin {
-		// fileData, err := ioutil.ReadFile(args[0])
-		// errout(err, "Unable to read file: %s", args[0])
-		// var inputToken StdToken
-		// err = json.Unmarshal(fileData, &inputToken)
-		// errout(err, "Unable to parse json sechme: %s", args[0])
+	if isStdToken && isBin {
 		binwriter.Write([]byte{0x01})
-		// _, err = packStdTokenParams(&inputToken)
-		// errout(err, "Failed pack params")
-		// writer.Write(data)
 		outbin(binwriter, out)
-	} else if isStdtoken && isAbi {
+	} else if isStdToken && isAbi {
 		abi, err := compiler.exportABI(0x01)
+		errout(err, "Failed export abi data")
+		outabi(abi, out)
+	} else if isNFToken && isBin {
+		binwriter.Write([]byte{0x02})
+		outbin(binwriter, out)
+	} else if isNFToken && isAbi {
+		abi, err := compiler.exportABI(0x02)
 		errout(err, "Failed export abi data")
 		outabi(abi, out)
 	}

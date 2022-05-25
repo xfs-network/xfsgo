@@ -1,7 +1,6 @@
 package vm
 
 import (
-	"bytes"
 	"math/big"
 )
 
@@ -24,10 +23,6 @@ type token struct {
 	Allowances  map[CTypeAddress]map[CTypeAddress]CTypeUint256 `contract:"storage"`
 }
 
-var (
-	zeroAddress = CTypeAddress{}
-)
-
 func (t *token) Create(
 	ctx *ContractContext,
 	name CTypeString,
@@ -43,12 +38,6 @@ func (t *token) Create(
 	t.Balances = make(map[CTypeAddress]CTypeUint256)
 	t.Balances[t.Owner] = totalSupply
 	return nil
-}
-func requireAddress(a CTypeAddress) bool {
-	return !assertAddress(a, zeroAddress)
-}
-func assertAddress(a CTypeAddress, b CTypeAddress) bool {
-	return bytes.Equal(a[:], b[:])
 }
 
 func (t *token) BuiltinId() uint8 {
