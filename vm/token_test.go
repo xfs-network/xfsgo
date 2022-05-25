@@ -274,4 +274,11 @@ func TestToken_Burn(t *testing.T) {
 	// 检查总量是否已扣减
 	wantTotalSupply := new(big.Int).Sub(oldTotalSupply.BigInt(), burnAmount.BigInt())
 	assertCTypeUint256(t, stdToken.TotalSupply, NewUint256(wantTotalSupply))
+	// 使用 a 地址燃烧 b地址余额
+	// 预期结果：失败，权限不足
+	bAddress := CTypeAddress{0x2}
+	result = stdToken.Burn(&ContractContext{
+		caller: aAddress.Address(),
+	}, bAddress, NewUint256(big.NewInt(10)))
+	assertCTypeBool(t, result, CBoolFalse)
 }
