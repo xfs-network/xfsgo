@@ -9,6 +9,7 @@ import (
 var (
 	testCtx = &ContractContext{
 		caller: common.Address{0xff},
+		logger: NewLogger(),
 	}
 	testWantToken = &token{
 		Name:        CTypeString("Tether USD"),
@@ -72,6 +73,7 @@ func TestToken_Transfer(t *testing.T) {
 	assertCTypeUint256(t, gotSenderBalance, NewUint256(wantSenderBalance))
 	wrongContext := &ContractContext{
 		caller: common.Address{0x10},
+		logger: NewLogger(),
 	}
 	// 第二次转移测试, 使用没有余额的发送地址向有余额的目标地址转移
 	// 期望结果：失败
@@ -187,17 +189,20 @@ func TestToken_TransferFrom(t *testing.T) {
 	// 预期结果：失败，消息发送者没有 b 地址的授额
 	result := stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(10)))
 	assertCTypeBool(t, result, CBoolFalse)
 	// 使用 b 地址作为发送者，授予 a 地址的额度 5
 	result = stdToken.Approve(&ContractContext{
 		caller: bAddress.Address(),
+		logger: NewLogger(),
 	}, aAddress, NewUint256(big.NewInt(5)))
 	assertCTypeBool(t, result, CBoolTrue)
 	// 继续测试1
 	// 预期结果：失败，b 地址没有余额
 	result = stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, aAddress, NewUint256(big.NewInt(10)))
 	assertCTypeBool(t, result, CBoolFalse)
 	// 给 b 地址 100 余额，并再次尝试测试1
@@ -206,17 +211,20 @@ func TestToken_TransferFrom(t *testing.T) {
 	assertCTypeBool(t, result, CBoolTrue)
 	result = stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(10)))
 	assertCTypeBool(t, result, CBoolFalse)
 	// 使用 b 地址向 a 地址重新授额 20
 	result = stdToken.Approve(&ContractContext{
 		caller: bAddress.Address(),
+		logger: NewLogger(),
 	}, aAddress, NewUint256(big.NewInt(20)))
 	assertCTypeBool(t, result, CBoolTrue)
 	// 再次尝试测试1
 	// 预期结果：成功
 	result = stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(10)))
 	assertCTypeBool(t, result, CBoolTrue)
 	// 检查a地址拥有b地址的转移额度是否扣减
@@ -257,6 +265,7 @@ func TestToken_Burn(t *testing.T) {
 	bAddress := CTypeAddress{0x2}
 	result = stdToken.Burn(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, NewUint256(big.NewInt(10)))
 	assertCTypeBool(t, result, CBoolFalse)
 }

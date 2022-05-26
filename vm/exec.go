@@ -35,6 +35,7 @@ type builtinContractExec struct {
 	address   common.Address
 	contractT reflect.Type
 	resultBuf *bytes.Buffer
+	logger    Logger
 }
 
 type stv struct {
@@ -74,6 +75,7 @@ func (ce *builtinContractExec) buildContract() (bc BuiltinContract, err error) {
 func (ce *builtinContractExec) buildContext() *ContractContext {
 	c := &ContractContext{}
 	c.caller = ce.caller
+	c.logger = ce.logger
 	return c
 }
 func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input []byte) error {

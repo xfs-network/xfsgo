@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"xfsgo/common"
 	"xfsgo/common/ahash"
@@ -33,12 +32,14 @@ var (
 type xvm struct {
 	stateTree core.StateTree
 	builtins  map[uint8]reflect.Type
+	logger    Logger
 }
 
 func NewXVM(st core.StateTree) *xvm {
 	vm := &xvm{
 		stateTree: st,
 		builtins:  make(map[uint8]reflect.Type),
+		logger:    NewLogger(),
 	}
 	vm.registerBuiltinId(new(token))
 	vm.registerBuiltinId(new(nftoken))
@@ -53,6 +54,7 @@ func (vm *xvm) newBuiltinContractExec(
 			stateTree: vm.stateTree,
 			address:   address,
 			code:      code,
+			logger:    vm.logger,
 			resultBuf: bytes.NewBuffer(nil),
 		}, nil
 	}
@@ -126,7 +128,7 @@ func (vm *xvm) Create(addr common.Address, input []byte) error {
 	fromAddressHashBytes := ahash.SHA256(addr[:])
 	fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
 	caddr := crypto.CreateAddress(fromAddressHash, nonce)
-	logrus.Infof("Create address: %s", caddr.B58String())
+	//logrus.Infof("Create address: %s", caddr.B58String())
 	if err := vm.Run(addr, caddr, nil, input); err != nil {
 		return err
 	}
@@ -138,6 +140,7 @@ func (vm *xvm) Call(from, address common.Address, input []byte) error {
 	if err := vm.Run(from, address, code, input); err != nil {
 		return err
 	}
+
 	return nil
 }
 func (vm *xvm) CallReturn(from, to common.Address, input []byte, result *[]byte) error {
@@ -155,17 +158,7 @@ func (vm *xvm) CallReturn(from, to common.Address, input []byte, result *[]byte)
 	}
 	return exec.CallReturn(input[3:], result)
 }
-func (vm *xvm) GetBuiltinContract(address common.Address) (c interface{}, err error) {
-	code := vm.stateTree.GetCode(address)
-	code, id, err := readXVMCode(code, nil)
-	if err != nil {
-		return
-	}
-	var exec *builtinContractExec
-	if exec, err = vm.newBuiltinContractExec(
-		id, common.Address{}, address, code); err != nil {
-		return
-	}
-	c, _, err = exec.MakeBuiltinContract()
-	return
+
+func (vm *xvm) GetLogger() Logger {
+	return vm.logger
 }

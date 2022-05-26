@@ -23,6 +23,19 @@ type token struct {
 	Allowances  map[CTypeAddress]map[CTypeAddress]CTypeUint256 `contract:"storage"`
 }
 
+type StdTokenTransferEvent struct {
+	From  CTypeAddress `json:"from"`
+	To    CTypeAddress `json:"to"`
+	Value CTypeUint256 `json:"value"`
+}
+
+type StdTokenApprovalEvent struct {
+	Owner   CTypeAddress `json:"owner"`
+	Spender CTypeAddress `json:"spender"`
+	Value   CTypeUint256 `json:"value"`
+}
+
+// Create ctx
 func (t *token) Create(
 	ctx *ContractContext,
 	name CTypeString,
@@ -37,6 +50,11 @@ func (t *token) Create(
 	t.Allowances = make(map[CTypeAddress]map[CTypeAddress]CTypeUint256)
 	t.Balances = make(map[CTypeAddress]CTypeUint256)
 	t.Balances[t.Owner] = totalSupply
+	ctx.logger.Event(&StdTokenTransferEvent{
+		From:  CTypeAddress{},
+		To:    t.Owner,
+		Value: totalSupply,
+	})
 	return nil
 }
 
@@ -98,6 +116,11 @@ func (t *token) Transfer(ctx *ContractContext, address CTypeAddress, amount CTyp
 		}
 		newBalance := new(big.Int).Add(targetBalance, amount.BigInt())
 		t.Balances[address] = NewUint256(newBalance)
+		ctx.logger.Event(&StdTokenTransferEvent{
+			From:  caller,
+			To:    address,
+			Value: amount,
+		})
 		return CBoolTrue
 	}
 	return CBoolFalse
@@ -131,6 +154,11 @@ func (t *token) TransferFrom(ctx *ContractContext, from, to CTypeAddress, amount
 		oldAllowance := t.Allowances[from][spender]
 		newAllowance := new(big.Int).Sub(oldAllowance.BigInt(), amount.BigInt())
 		t.Allowances[from][spender] = NewUint256(newAllowance)
+		ctx.logger.Event(&StdTokenTransferEvent{
+			From:  from,
+			To:    to,
+			Value: amount,
+		})
 		return CBoolTrue
 	}
 	return CBoolFalse
@@ -142,14 +170,29 @@ func (t *token) Approve(ctx *ContractContext, spender CTypeAddress, amount CType
 	owner := NewAddress(ctx.caller)
 	if _, exists := t.Allowances[owner][spender]; exists {
 		t.Allowances[owner][spender] = amount
+		ctx.logger.Event(&StdTokenApprovalEvent{
+			Owner:   owner,
+			Spender: spender,
+			Value:   amount,
+		})
 		return CBoolTrue
 	}
 	if _, exists := t.Allowances[owner]; exists {
 		t.Allowances[owner][spender] = amount
+		ctx.logger.Event(&StdTokenApprovalEvent{
+			Owner:   owner,
+			Spender: spender,
+			Value:   amount,
+		})
 		return CBoolTrue
 	}
 	t.Allowances[owner] = make(map[CTypeAddress]CTypeUint256)
 	t.Allowances[owner][spender] = amount
+	ctx.logger.Event(&StdTokenApprovalEvent{
+		Owner:   owner,
+		Spender: spender,
+		Value:   amount,
+	})
 	return CBoolTrue
 }
 func (t *token) Allowance(owner, spender CTypeAddress) CTypeUint256 {
@@ -178,6 +221,11 @@ func (t *token) Burn(ctx *ContractContext, address CTypeAddress, amount CTypeUin
 		oldTotalSupply := t.TotalSupply
 		newTotalSupply := new(big.Int).Sub(oldTotalSupply.BigInt(), amount.BigInt())
 		t.TotalSupply = NewUint256(newTotalSupply)
+		ctx.logger.Event(&StdTokenTransferEvent{
+			From:  address,
+			To:    CTypeAddress{},
+			Value: amount,
+		})
 		return CBoolTrue
 	}
 	return CBoolFalse

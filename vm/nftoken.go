@@ -23,6 +23,24 @@ type nftoken struct {
 	Allowances      map[CTypeAddress]map[CTypeAddress]CTypeBool `contract:"storage"`
 }
 
+type NFTokenTransferEvent struct {
+	From    CTypeAddress `json:"from"`
+	To      CTypeAddress `json:"to"`
+	TokenId CTypeUint256 `json:"TokenId"`
+}
+
+type NFTokenApprovalEvent struct {
+	Owner    CTypeAddress `json:"owner"`
+	Approved CTypeAddress `json:"approved"`
+	TokenId  CTypeUint256 `json:"tokenId"`
+}
+
+type NFTokenApprovalForAllEvent struct {
+	Owner    CTypeAddress `json:"owner"`
+	Operator CTypeAddress `json:"operator"`
+	Approved CTypeBool    `json:"approved"`
+}
+
 func (t *nftoken) Create(
 	ctx *ContractContext,
 	name CTypeString,
@@ -65,6 +83,11 @@ func (t *nftoken) Mint(ctx *ContractContext, address CTypeAddress) CTypeUint256 
 	t.Balances[address] = NewUint256(newBalance)
 	t.Owners[NewUint256(tokenId)] = address
 	t.Counter = NewUint256(tokenId)
+	ctx.logger.Event(&NFTokenTransferEvent{
+		From:    CTypeAddress{},
+		To:      address,
+		TokenId: NewUint256(tokenId),
+	})
 	return NewUint256(tokenId)
 }
 func (t *nftoken) BalanceOf(addr CTypeAddress) CTypeUint256 {
@@ -127,6 +150,11 @@ func (t *nftoken) TransferFrom(ctx *ContractContext, from, to CTypeAddress, toke
 	toNewBalance := new(big.Int).Sub(toOldBalance.BigInt(), big.NewInt(1))
 	t.Balances[to] = NewUint256(toNewBalance)
 	t.Owners[tokenId] = to
+	ctx.logger.Event(&NFTokenTransferEvent{
+		From:    from,
+		To:      to,
+		TokenId: tokenId,
+	})
 	return CBoolTrue
 }
 
@@ -148,6 +176,11 @@ func (t *nftoken) Approve(ctx *ContractContext, to CTypeAddress, tokenId CTypeUi
 		}
 	}
 	t.approve(to, tokenId)
+	ctx.logger.Event(&NFTokenApprovalEvent{
+		Owner:    owner,
+		Approved: to,
+		TokenId:  tokenId,
+	})
 	return CBoolTrue
 }
 func (t *nftoken) GetApproved(tokenId CTypeUint256) CTypeAddress {
@@ -167,14 +200,29 @@ func (t *nftoken) SetApprovalForAll(ctx *ContractContext, operator CTypeAddress,
 	}
 	if _, exists := t.Allowances[owner][operator]; exists {
 		t.Allowances[owner][operator] = value
+		ctx.logger.Event(&NFTokenApprovalForAllEvent{
+			Owner:    owner,
+			Operator: operator,
+			Approved: value,
+		})
 		return CBoolTrue
 	}
 	if _, exists := t.Allowances[owner]; exists {
 		t.Allowances[owner][operator] = value
+		ctx.logger.Event(&NFTokenApprovalForAllEvent{
+			Owner:    owner,
+			Operator: operator,
+			Approved: value,
+		})
 		return CBoolTrue
 	}
 	t.Allowances[owner] = make(map[CTypeAddress]CTypeBool)
 	t.Allowances[owner][operator] = value
+	ctx.logger.Event(&NFTokenApprovalForAllEvent{
+		Owner:    owner,
+		Operator: operator,
+		Approved: value,
+	})
 	return CBoolTrue
 }
 

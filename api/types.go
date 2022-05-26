@@ -108,14 +108,15 @@ type MinerStatusResp struct {
 }
 
 type ReceiptResp struct {
-	Version     uint32      `json:"version"`
-	Status      uint32      `json:"status"`
-	TxHash      common.Hash `json:"tx_hash"`
-	GasUsed     *big.Int    `json:"gas_used"`
-	BlockHeight uint64      `json:"block_height"`
-	BlockHash   common.Hash `json:"block_hash"`
-	BlockIndex  uint64      `json:"block_index"`
-	TxIndex     uint64      `json:"tx_index"`
+	Version     uint32        `json:"version"`
+	Status      uint32        `json:"status"`
+	TxHash      common.Hash   `json:"tx_hash"`
+	GasUsed     *big.Int      `json:"gas_used"`
+	BlockHeight uint64        `json:"block_height"`
+	BlockHash   common.Hash   `json:"block_hash"`
+	BlockIndex  uint64        `json:"block_index"`
+	TxIndex     uint64        `json:"tx_index"`
+	Logs        []common.Hash `json:"logs"`
 }
 
 type ChainStatusResp struct {
@@ -219,10 +220,10 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 	if err != nil {
 		return err
 	}
-    datahex := hex.EncodeToString(tx.Data)
-    signhex := hex.EncodeToString(tx.Signature)
-    result.Data = "0x" + datahex
-    result.Signature = "0x" + signhex
+	datahex := hex.EncodeToString(tx.Data)
+	signhex := hex.EncodeToString(tx.Signature)
+	result.Data = "0x" + datahex
+	result.Signature = "0x" + signhex
 	result.From = from.B58String()
 	return nil
 }
@@ -259,10 +260,10 @@ func coverState2Resp(state *xfsgo.StateObj, dst **StateObjResp) error {
 		result.StateRoot = &stateRoot
 	}
 	balance := state.GetBalance()
-    if balance == nil {
-        balance = big.NewInt(0)
-    }
-    balanceTextm := balance.Text(10)
+	if balance == nil {
+		balance = big.NewInt(0)
+	}
+	balanceTextm := balance.Text(10)
 	result.Balance = &balanceTextm
 	result.Nonce = state.GetNonce()
 	*dst = result

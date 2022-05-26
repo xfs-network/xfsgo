@@ -123,11 +123,16 @@ func runDaemon() error {
 	if err != nil {
 		return err
 	}
+	logsDB, err := badger.New(config.storageParams.logsDir)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		safeclose(chainDb.Close)
 		safeclose(keysDb.Close)
 		safeclose(stateDB.Close)
 		safeclose(extraDB.Close)
+		safeclose(logsDB.Close)
 	}()
 	backparams := &config.backendParams
 	backparams.Debug = debug
@@ -141,6 +146,7 @@ func runDaemon() error {
 		KeysDB:  keysDb,
 		StateDB: stateDB,
 		ExtraDB: extraDB,
+		LogsDB:  logsDB,
 	}); err != nil {
 		return err
 	}

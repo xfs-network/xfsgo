@@ -17,6 +17,7 @@ func TestNftoken_Create(t *testing.T) {
 	stdToken := new(nftoken)
 	err := stdToken.Create(&ContractContext{
 		caller: mockNFToken.Creator.Address(),
+		logger: NewLogger(),
 	},
 		mockNFToken.Name,
 		mockNFToken.Symbol,
@@ -47,6 +48,7 @@ func TestNftoken_Mint(t *testing.T) {
 	stdToken := new(nftoken)
 	err := stdToken.Create(&ContractContext{
 		caller: mockNFToken.Creator.Address(),
+		logger: NewLogger(),
 	},
 		mockNFToken.Name,
 		mockNFToken.Symbol,
@@ -59,12 +61,14 @@ func TestNftoken_Mint(t *testing.T) {
 	// 使用a地址给b地址铸造nft
 	result := stdToken.Mint(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress)
 	// 预期结果：失败，没有铸造权限，返回零id
 	assertCTypeUint256(t, result, CTypeUint256{})
 	// 使用mock地址给a地址铸造
 	result = stdToken.Mint(&ContractContext{
 		caller: mockNFToken.Creator.Address(),
+		logger: NewLogger(),
 	}, aAddress)
 	// 预期结果：成功, 返回非零id
 	assertCTypeUint256NotEq(t, result, CTypeUint256{})
@@ -83,6 +87,7 @@ func TestNftoken_TransferFrom(t *testing.T) {
 	stdToken := new(nftoken)
 	err := stdToken.Create(&ContractContext{
 		caller: mockNFToken.Creator.Address(),
+		logger: NewLogger(),
 	},
 		mockNFToken.Name,
 		mockNFToken.Symbol,
@@ -96,29 +101,34 @@ func TestNftoken_TransferFrom(t *testing.T) {
 	// 使用a地址从b地址向c地址转移ID 1
 	result := stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(1)))
 	// 预期结果：失败
 	assertCTypeBool(t, result, CBoolFalse)
 	// 使用合约创建者给b地址铸造nft
 	tokenId := stdToken.Mint(&ContractContext{
 		caller: mockNFToken.Creator.Address(),
+		logger: NewLogger(),
 	}, bAddress)
 	// 预期结果，非零id
 	assertCTypeUint256NotEq(t, tokenId, CTypeUint256{})
 	// 使用a地址从b地址向c地址转移ID 1
 	result = stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(1)))
 	// 预期结果：失败
 	assertCTypeBool(t, result, CBoolFalse)
 	// 使用b地址给a地址授予ID 1的转移权限
 	approved := stdToken.Approve(&ContractContext{
 		caller: bAddress.Address(),
+		logger: NewLogger(),
 	}, aAddress, NewUint256(big.NewInt(1)))
 	assertCTypeBool(t, approved, CBoolTrue)
 	// 再次转移
 	result = stdToken.TransferFrom(&ContractContext{
 		caller: aAddress.Address(),
+		logger: NewLogger(),
 	}, bAddress, cAddress, NewUint256(big.NewInt(1)))
 	// 预期结果：成功
 	assertCTypeBool(t, result, CBoolTrue)

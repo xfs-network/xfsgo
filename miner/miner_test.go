@@ -46,13 +46,14 @@ func createMiner(t *testing.T) *Miner {
 	chainDb := test.NewMemStorage()
 
 	extraDb := test.NewMemStorage()
+	logsDb := test.NewMemStorage()
 
 	event := xfsgo.NewEventBus()
 	if _, err := xfsgo.WriteTestGenesisBlock(test.TestGenesisBits, stateDb, chainDb); err != nil {
 		t.Error(err)
 		return nil
 	}
-	bc, err := xfsgo.NewBlockChainN(stateDb, chainDb, extraDb, event, false)
+	bc, err := xfsgo.NewBlockChainN(stateDb, chainDb, extraDb, logsDb, event, false)
 	if err != nil {
 		t.Error(err)
 		return nil

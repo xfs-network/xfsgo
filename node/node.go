@@ -33,6 +33,7 @@ import (
 	"xfsgo/p2p/discover"
 	"xfsgo/p2p/nat"
 	"xfsgo/storage/badger"
+	"xfsgo/vm"
 )
 
 // Node is a container on which services can be registered.
@@ -113,6 +114,7 @@ func (n *Node) Start() error {
 //RegisterBackend registers built-in APIs.
 func (n *Node) RegisterBackend(
 	stateDb *badger.Storage,
+	logsDB badger.IStorage,
 	bc *xfsgo.BlockChain,
 	miner *miner.Miner,
 	wallet *xfsgo.Wallet,
@@ -120,6 +122,7 @@ func (n *Node) RegisterBackend(
 	chainApiHandler := &api.ChainAPIHandler{
 		BlockChain:    bc,
 		TxPendingPool: txPool,
+		LogStorage:    vm.NewLogStorage(logsDB),
 	}
 	minerApiHandler := &api.MinerAPIHandler{
 		Miner: miner,

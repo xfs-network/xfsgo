@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"math/big"
 	"runtime"
 	"sync"
@@ -28,8 +29,6 @@ import (
 	"xfsgo"
 	"xfsgo/common"
 	"xfsgo/storage/badger"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -91,10 +90,11 @@ type Miner struct {
 	runningHashRate  chan common.HashRate
 	lastHashRate     common.HashRate
 	reportHashes     chan uint64
+	logsDB           badger.IStorage
 }
 
 func NewMiner(config *Config,
-	stateDb badger.IStorage, chain xfsgo.IBlockChain, eventBus *xfsgo.EventBus, pool *xfsgo.TxPool,
+	logsDB, stateDb badger.IStorage, chain xfsgo.IBlockChain, eventBus *xfsgo.EventBus, pool *xfsgo.TxPool,
 	gasPrice, gasLimit *big.Int) *Miner {
 	m := &Miner{
 		Config:           config,
@@ -481,6 +481,10 @@ out:
 			block.Height(), hash[len(hash)-4:], len(block.Transactions), timeused.Seconds(), hashrate)
 		if err = stateTree.Commit(); err != nil {
 			logrus.Warnln("State tree commit err: ", err)
+			continue out
+		}
+		if err = m.chain.CommitLogs(block); err != nil {
+			logrus.Warnln("logs commit err: ", err)
 			continue out
 		}
 		if err = m.chain.WriteBlock(block); err != nil {

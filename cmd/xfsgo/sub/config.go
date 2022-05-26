@@ -40,6 +40,7 @@ const (
 	defaultKeysDir           = "keys"
 	defaultExtraDir          = "extra"
 	defaultNodesDir          = "nodes"
+	defaultLogsDir           = "logs"
 	defaultRPCClientAPIHost  = "127.0.0.1:9012"
 	defaultNodeRPCListenAddr = "127.0.0.1:9012"
 	defaultNodeP2PListenAddr = "0.0.0.0:9011"
@@ -61,6 +62,7 @@ type storageParams struct {
 	stateDir string
 	extraDir string
 	nodesDir string
+	logsDir  string
 }
 
 type loggerParams struct {
@@ -132,6 +134,10 @@ func setupDataDir(params *storageParams, datadir string) {
 		params.nodesDir = filepath.Join(
 			params.dataDir, defaultNodesDir)
 	}
+	if params.logsDir == "" {
+		params.logsDir = filepath.Join(
+			params.dataDir, defaultLogsDir)
+	}
 }
 
 func parseConfigStorageParams(v *viper.Viper) storageParams {
@@ -159,7 +165,7 @@ func defaultBootstrapNodes(netid uint32) []string {
 	if netid == 2 {
 		// test net boot nodes
 		return []string{
-            "xfsnode://192.168.2.3:9011/?id=eade79b2acb80f76cf9872fa68b9ec6e25f948a2d9980579840cf0fe73b3c91a7df7185ff64fd213c5f1b8aca528d537f443c8fd5a6e35d3893474ebeb18291a",
+			"xfsnode://192.168.2.3:9011/?id=eade79b2acb80f76cf9872fa68b9ec6e25f948a2d9980579840cf0fe73b3c91a7df7185ff64fd213c5f1b8aca528d537f443c8fd5a6e35d3893474ebeb18291a",
 		}
 	}
 	return make([]string, 0)

@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 	"xfsgo/common"
+	"xfsgo/common/ahash"
+	"xfsgo/crypto"
 	"xfsgo/storage/badger"
 	"xfsgo/vm"
 
@@ -115,6 +117,7 @@ type IBlockChain interface {
 	CalcNextRequiredDifficulty() (uint32, error)
 	CalcNextRequiredBitsByHeight(height uint64, hash common.Hash) (uint32, error)
 	CurrentStateTree() *StateTree
+	CommitLogs(block *Block) error
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -125,6 +128,7 @@ type BlockChain struct {
 	stateDB        badger.IStorage
 	chainDB        *chainDB
 	extraDB        *extraDB
+	logStorage     vm.LogStorage
 	genesisBHeader *BlockHeader
 	currentBHeader *BlockHeader
 	lastBlockHash  common.Hash
@@ -143,12 +147,13 @@ type BlockChain struct {
 	syncStatsLock   sync.RWMutex // Lock protecting the sync stats fields
 }
 
-func NewBlockChainN(stateDB, chainDB, extraDB badger.IStorage, eventBus *EventBus, debug bool) (*BlockChain, error) {
+func NewBlockChainN(stateDB, chainDB, extraDB, logDB badger.IStorage, eventBus *EventBus, debug bool) (*BlockChain, error) {
 	bc := &BlockChain{
-		chainDB:  newChainDBN(chainDB, debug),
-		stateDB:  stateDB,
-		extraDB:  newExtraDB(extraDB),
-		eventBus: eventBus,
+		chainDB:    newChainDBN(chainDB, debug),
+		stateDB:    stateDB,
+		extraDB:    newExtraDB(extraDB),
+		eventBus:   eventBus,
+		logStorage: vm.NewLogStorage(logDB),
 	}
 	bc.orphans = make(map[common.Hash]*orphanBlock)
 	bc.prevOrphans = make(map[common.Hash][]*orphanBlock)
@@ -641,6 +646,10 @@ func (bc *BlockChain) maybeAcceptBlock(block *Block) error {
 		logrus.Errorf("Accept block err: %v", err)
 		return ErrWriteBlock
 	}
+	if err = bc.CommitLogs(block); err != nil {
+		logrus.Errorf("Accept block err: %v", err)
+		return ErrWriteBlock
+	}
 	if err = bc.writeBlock(block); err != nil {
 		logrus.Errorf("Accept block err: %v", err)
 		return ErrWriteBlock
@@ -936,7 +945,11 @@ func useGas(gas, amount *big.Int) error {
 func TxToAddrNotSet(tx *Transaction) bool {
 	return bytes.Equal(tx.To[:], common.ZeroAddr[:])
 }
-
+func makeAddress(addr common.Address, nonce uint64) common.Address {
+	fromAddressHashBytes := ahash.SHA256(addr[:])
+	fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
+	return crypto.CreateAddress(fromAddressHash, nonce)
+}
 func (bc *BlockChain) ApplyTransaction(
 	stateTree *StateTree, _ *BlockHeader,
 	tx *Transaction, gp *GasPool, totalGas *big.Int) (*Receipt, error) {
@@ -964,19 +977,33 @@ func (bc *BlockChain) ApplyTransaction(
 			status = 1
 		}
 	} else {
-        
 		fromaddr, _ := tx.FromAddr()
 		txhash := tx.Hash()
 		logrus.Debugf("Transfer: from=%s, to=%s, value=%s, txhash=%x", fromaddr.B58String(), tx.To.B58String(), tx.Value, txhash[len(txhash)-4:])
 		if err = bc.transfer(stateTree, sender, tx.To, tx.Value); err != nil {
 			return nil, err
 		}
-        if err = mVm.Call(sender.address, tx.To, tx.Data); err == nil {
-            status = 1
-        }else {
-            logrus.Infof("exec err: %s", err)
-        }
+		if err = mVm.Call(sender.address, tx.To, tx.Data); err == nil {
+			status = 1
+		} else {
+			logrus.Infof("exec err: %s", err)
+		}
 	}
+	eventLogger := mVm.GetLogger()
+	events := eventLogger.GetEvents()
+	eventHashes := make([]common.Hash, len(events))
+	for i := 0; i < len(eventHashes); i++ {
+		event := events[i]
+		eventHashes[i] = event.Hash
+	}
+	var logaddr common.Address
+	if TxToAddrNotSet(tx) {
+		logaddr = makeAddress(sender.address, tx.Nonce)
+	} else {
+		logaddr = sender.address
+	}
+	bc.logStorage.PutAllEvents(tx.Hash(), logaddr, events)
+
 	stateTree.AddNonce(sender.address, 1)
 
 	// refundGas
@@ -991,6 +1018,7 @@ func (bc *BlockChain) ApplyTransaction(
 		Version: tx.Version,
 		Status:  status,
 		GasUsed: mgasused,
+		Logs:    eventHashes,
 	}
 	return receipt, nil
 }
@@ -1130,4 +1158,7 @@ func (bc *BlockChain) CurrentStateTree() *StateTree {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
 	return bc.stateTree
+}
+func (bc *BlockChain) CommitLogs(block *Block) error {
+	return bc.logStorage.SaveEvents(block)
 }

@@ -66,6 +66,7 @@ type Config struct {
 	KeysDB  *badger.Storage
 	StateDB *badger.Storage
 	ExtraDB *badger.Storage
+	LogsDB  *badger.Storage
 }
 
 type chainSyncProtocol struct {
@@ -114,8 +115,8 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	}
 	if back.blockchain, err = xfsgo.NewBlockChainN(
 		back.config.StateDB, back.config.ChainDB,
-		back.config.ExtraDB, back.eventBus,
-		config.Debug); err != nil {
+		back.config.ExtraDB, back.config.LogsDB,
+		back.eventBus, config.Debug); err != nil {
 		return nil, err
 	}
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
@@ -141,7 +142,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		Numworkers: config.Numworkers,
 	}
 	back.miner = miner.NewMiner(minerconfig,
-		back.config.StateDB, back.blockchain,
+		back.config.LogsDB, back.config.StateDB, back.blockchain,
 		back.eventBus, back.txPool,
 		config.MinGasPrice, common.TxPoolGasLimit)
 
@@ -150,6 +151,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	//Node resgisters apis of baclend on the node  for RPC service.
 	if err = stack.RegisterBackend(
 		back.config.StateDB,
+		back.config.LogsDB,
 		back.blockchain,
 		back.miner,
 		back.wallet,

@@ -24,6 +24,7 @@ import (
 	"xfsgo"
 	"xfsgo/common"
 	"xfsgo/crypto"
+	"xfsgo/vm"
 
 	"github.com/sirupsen/logrus"
 )
@@ -31,6 +32,7 @@ import (
 type ChainAPIHandler struct {
 	BlockChain    *xfsgo.BlockChain
 	TxPendingPool *xfsgo.TxPool
+	LogStorage    vm.LogStorage
 	number        int
 }
 
@@ -252,6 +254,7 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 		BlockHash:   dataReceiptIndex.BlockHash,
 		BlockIndex:  dataReceiptIndex.BlockIndex,
 		TxIndex:     dataReceiptIndex.Index,
+		Logs:        dataReceipt.Logs,
 	}
 
 	return coverReceipt(data, resp)
@@ -448,4 +451,83 @@ func (handler *ChainAPIHandler) GetBlockTxByNumAndIndex(args GetBlockTxByNumAndI
 	}
 	tx := gotBlock.Transactions[args.Index]
 	return coverTx2Resp(tx, &resp)
+}
+
+type GetLogsRequest struct {
+	FromBlock string `json:"from_block"`
+	ToBlock   string `json:"to_block"`
+	Address   string `json:"address"`
+	EventHash string `json:"event_hash"`
+}
+
+type EventLogResp struct {
+	BlockHeight     uint64         `json:"block_number"`
+	BlockHash       common.Hash    `json:"block_hash"`
+	TransactionHash common.Hash    `json:"transaction_hash"`
+	EventHash       common.Hash    `json:"event_hash"`
+	EventValue      string         `json:"event_value"`
+	Address         common.Address `json:"address"`
+}
+
+func coverEventObjToReps(src []*vm.EventObj, dst **[]*EventLogResp) error {
+	for _, srcv := range src {
+		resp := &EventLogResp{
+			BlockHeight:     srcv.BlockHeight,
+			BlockHash:       srcv.BlockHash,
+			TransactionHash: srcv.TransactionHash,
+			EventHash:       srcv.EventHash,
+			Address:         srcv.Address,
+		}
+		resp.EventValue = common.BytesToHexString(srcv.EventValue)
+		**dst = append(**dst, resp)
+	}
+	return nil
+}
+
+func (handler *ChainAPIHandler) GetLogs(args GetLogsRequest, resp *[]*EventLogResp) error {
+	var start uint64
+	if n, err := strconv.ParseUint(args.FromBlock, 10, 64); err == nil {
+		start = n
+	}
+	var end uint64
+	if n, err := strconv.ParseUint(args.ToBlock, 10, 64); err == nil {
+		if n < start {
+			return xfsgo.NewRPCError(-1006, "to_block < from_block")
+		}
+		end = n
+	} else {
+		currentHeader := handler.BlockChain.CurrentBHeader()
+		end = currentHeader.Height
+	}
+	lastBlock := handler.BlockChain.GetBlockByNumber(end)
+	hashes := make([]common.Hash, 0)
+	for i := end; i >= start && lastBlock != nil; i-- {
+		hashes = append(hashes, lastBlock.HeaderHash())
+		lastBlock = handler.BlockChain.GetBlockByHash(lastBlock.HashPrevBlock())
+	}
+	events := make([]*vm.EventObj, 0)
+	for i := 0; i < len(hashes); i++ {
+		if obj, ok := handler.LogStorage.GetEventLogs(hashes[i]); ok {
+			eventHash := common.Hex2Hash(args.EventHash)
+			address := common.StrB58ToAddress(args.Address)
+			if bytes.Equal(eventHash[:], common.ZeroHash[:]) &&
+				bytes.Equal(address[:], common.ZeroAddr[:]) {
+				events = append(events, obj...)
+				continue
+			}
+			for _, item := range obj {
+				if bytes.Equal(address[:], common.ZeroAddr[:]) &&
+					bytes.Equal(eventHash[:], item.EventHash[:]) {
+					events = append(events, item)
+				} else if bytes.Equal(eventHash[:], common.ZeroHash[:]) &&
+					bytes.Equal(address[:], item.Address[:]) {
+					events = append(events, item)
+				} else if bytes.Equal(address[:], item.Address[:]) &&
+					bytes.Equal(eventHash[:], item.EventHash[:]) {
+					events = append(events, item)
+				}
+			}
+		}
+	}
+	return coverEventObjToReps(events, &resp)
 }

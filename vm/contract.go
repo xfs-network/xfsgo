@@ -7,5 +7,6 @@ type BuiltinContract interface {
 }
 
 type ContractContext struct {
-    caller common.Address
+	caller common.Address
+	logger Logger
 }

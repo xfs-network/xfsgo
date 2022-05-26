@@ -279,6 +279,10 @@ func (t *Transaction) FromAddress() common.Address {
 	return addr
 }
 
+func (t *Transaction) ToAddress() common.Address {
+	return t.To
+}
+
 func (t *Transaction) String() string {
 	jsondata, err := json.Marshal(t)
 	if err != nil {

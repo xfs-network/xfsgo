@@ -33,13 +33,14 @@ func setupTxPool() (*TxPool, *ecdsa.PrivateKey) {
 	chainDb := test.NewMemStorage()
 
 	extraDb := test.NewMemStorage()
+	logsDb := test.NewMemStorage()
 
 	event := NewEventBus()
 	if _, err := WriteTestGenesisBlock(test.TestGenesisBits, stateDb, chainDb); err != nil {
 		fmt.Printf("WriteTestGenesisBlock Error:%v\n", err)
 		return nil, nil
 	}
-	bc, err := NewBlockChainN(stateDb, chainDb, extraDb, event, false)
+	bc, err := NewBlockChainN(stateDb, chainDb, extraDb, logsDb, event, false)
 	if err != nil {
 		fmt.Printf("NewBlockChain Error:%v\n", err)
 		return nil, nil

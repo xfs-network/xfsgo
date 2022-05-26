@@ -25,10 +25,11 @@ import (
 )
 
 type Receipt struct {
-	Version uint32      `json:"version"`
-	Status  uint32      `json:"status"`
-	TxHash  common.Hash `json:"tx_hash"`
-	GasUsed *big.Int    `json:"gas_used"`
+	Version uint32        `json:"version"`
+	Status  uint32        `json:"status"`
+	TxHash  common.Hash   `json:"tx_hash"`
+	GasUsed *big.Int      `json:"gas_used"`
+	Logs    []common.Hash `json:"logs"`
 }
 
 func NewReceipt(txHash common.Hash) *Receipt {
