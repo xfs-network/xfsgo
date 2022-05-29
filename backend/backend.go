@@ -150,6 +150,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		minerconfig.Coinbase.B58String(), config.MinGasPrice, common.TxPoolGasLimit)
 	//Node resgisters apis of baclend on the node  for RPC service.
 	if err = stack.RegisterBackend(
+		back.eventBus,
 		back.config.StateDB,
 		back.config.LogsDB,
 		back.blockchain,

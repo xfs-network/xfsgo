@@ -113,6 +113,7 @@ func (n *Node) Start() error {
 
 //RegisterBackend registers built-in APIs.
 func (n *Node) RegisterBackend(
+	eventbus *xfsgo.EventBus,
 	stateDb *badger.Storage,
 	logsDB badger.IStorage,
 	bc *xfsgo.BlockChain,
@@ -174,6 +175,11 @@ func (n *Node) RegisterBackend(
 		return err
 	}
 	if err := n.rpcServer.RegisterName("VM", vmHandler); err != nil {
+		log.Fatalf("RPC service register error: %s", err)
+		return err
+	}
+	subscriber := api.NewEventSubscriber(eventbus)
+	if err := n.rpcServer.RegisterSubscribe("Subscriber", subscriber); err != nil {
 		log.Fatalf("RPC service register error: %s", err)
 		return err
 	}

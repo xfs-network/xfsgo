@@ -39,7 +39,7 @@ type jsonRPCReq struct {
 type jsonRPCResp struct {
 	JSONRPC string      `json:"jsonrpc"`
 	Result  interface{} `json:"result"`
-	Error   *RPCError   `json:"error"`
+	Error   RPCError    `json:"error"`
 	ID      int         `json:"id"`
 }
 

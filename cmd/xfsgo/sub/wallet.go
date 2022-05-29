@@ -254,7 +254,7 @@ func getWalletList() error {
 	}
 	// get height and hash
 	block := make(map[string]interface{}, 1)
-	err = cli.CallMethod(1, "Chain.Head", nil, &block)
+	err = cli.CallMethod(1, "Chain.GetHead", nil, &block)
 	if err != nil {
 		return err
 	}

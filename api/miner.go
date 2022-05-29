@@ -46,7 +46,7 @@ type MinerSetWorkerArgs struct {
 	Num string `json:"num"`
 }
 
-func (handler *MinerAPIHandler) Start(args MinerStartArgs, resp *string) error {
+func (handler *MinerAPIHandler) Start(args MinerStartArgs, resp **string) error {
 	num, err := strconv.ParseUint(args.Num, 10, 32)
 	if err != nil {
 		return errorcase(err)
@@ -56,13 +56,12 @@ func (handler *MinerAPIHandler) Start(args MinerStartArgs, resp *string) error {
 
 }
 
-func (handler *MinerAPIHandler) Stop(_ EmptyArgs, resp *string) error {
+func (handler *MinerAPIHandler) Stop(_ EmptyArgs, resp **string) error {
 	handler.Miner.Stop()
-	*resp = ""
 	return nil
 }
 
-func (handler *MinerAPIHandler) SetWorkers(args MinerSetWorkerArgs, resp *string) error {
+func (handler *MinerAPIHandler) SetWorkers(args MinerSetWorkerArgs, resp **string) error {
 	var err error
 	var num int64
 	if num, err = strconv.ParseInt(args.Num, 10, 64); err != nil {
@@ -71,7 +70,7 @@ func (handler *MinerAPIHandler) SetWorkers(args MinerSetWorkerArgs, resp *string
 	return errorcase(handler.Miner.SetWorkers(uint32(num)))
 }
 
-func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp *string) error {
+func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp **string) error {
 	gaspriceBig, ok := new(big.Int).SetString(args.Value, 10)
 	if !ok {
 		return xfsgo.NewRPCError(-1006, "string to big.Int error")
@@ -88,7 +87,7 @@ func (handler *MinerAPIHandler) SetGasPrice(args MinerSetGasPriceArgs, resp *str
 // 	return errorcase(handler.Miner.SetGasLimit(value))
 // }
 
-func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error {
+func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp **MinerStatusResp) error {
 	mMiner := handler.Miner
 	gasLimit := handler.Miner.GetGasLimit()
 	gasPrice := handler.Miner.GetGasPrice()
@@ -110,6 +109,6 @@ func (handler *MinerAPIHandler) Status(_ EmptyArgs, resp *MinerStatusResp) error
 		HashRate:         fmt.Sprintf("%.2f", float64(hashRate)),
 		Workers:          strconv.Itoa(int(MinWorkers)),
 	}
-	*resp = *result
+	*resp = result
 	return nil
 }

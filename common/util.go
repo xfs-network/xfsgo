@@ -27,7 +27,7 @@ import (
 )
 
 func MakeStateKey(addr Address, key []byte) []byte {
-    return ahash.SHA256(append(addr[:], key...))
+	return ahash.SHA256(append(addr[:], key...))
 }
 
 func ObjSHA256(obj rawencode.RawEncoder) ([]byte, []byte, error) {

@@ -67,12 +67,13 @@ type SetGasPriceArgs struct {
 	GasPrice string `json:"gas_price"`
 }
 
-func (handler *WalletHandler) Create(_ EmptyArgs, resp *string) error {
+func (handler *WalletHandler) Create(_ EmptyArgs, resp **string) error {
 	addr, err := handler.Wallet.AddByRandom()
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-6001, err)
 	}
-	*resp = addr.B58String()
+	respstring := addr.B58String()
+	*resp = &respstring
 	return nil
 }
 func (handler *WalletHandler) Del(args WalletByAddressArgs, resp *interface{}) error {
@@ -90,7 +91,7 @@ func (handler *WalletHandler) Del(args WalletByAddressArgs, resp *interface{}) e
 	return nil
 }
 
-func (handler *WalletHandler) List(_ EmptyArgs, resp *[]common.Address) error {
+func (handler *WalletHandler) List(_ EmptyArgs, resp **[]common.Address) error {
 	data := handler.Wallet.All()
 	var out Wallets
 	for addr, v := range data {
@@ -111,18 +112,18 @@ func (handler *WalletHandler) List(_ EmptyArgs, resp *[]common.Address) error {
 	for i := 0; i < len(out); i++ {
 		result = append(result, out[i].addr)
 	}
-
-	*resp = result
+	*resp = &result
 	return nil
 }
 
-func (handler *WalletHandler) GetDefaultAddress(_ EmptyArgs, resp *string) error {
+func (handler *WalletHandler) GetDefaultAddress(_ EmptyArgs, resp **string) error {
 	address := handler.Wallet.GetDefault()
 	zero := [25]byte{0}
 	if bytes.Compare(address.Bytes(), zero[:]) == common.Zero {
 		return nil
 	}
-	*resp = address.B58String()
+	respstr := address.B58String()
+	*resp = &respstr
 	return nil
 }
 
@@ -141,7 +142,7 @@ func (handler *WalletHandler) SetDefaultAddress(args SetDefaultAddrArgs, _ **str
 
 }
 
-func (handler *WalletHandler) ExportByAddress(args WalletByAddressArgs, resp *string) error {
+func (handler *WalletHandler) ExportByAddress(args WalletByAddressArgs, resp **string) error {
 	if args.Address == "" {
 		return xfsgo.NewRPCError(-1006, "parameter cannot be empty")
 	}
@@ -153,11 +154,12 @@ func (handler *WalletHandler) ExportByAddress(args WalletByAddressArgs, resp *st
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-6001, err)
 	}
-	*resp = "0x" + hex.EncodeToString(pk)
+	resphex := "0x" + hex.EncodeToString(pk)
+	*resp = &resphex
 	return nil
 }
 
-func (handler *WalletHandler) ImportByPrivateKey(args WalletImportArgs, resp *string) error {
+func (handler *WalletHandler) ImportByPrivateKey(args WalletImportArgs, resp **string) error {
 	if args.Key == "" {
 		return xfsgo.NewRPCError(-1006, "parameter cannot be empty")
 	}
@@ -179,11 +181,12 @@ func (handler *WalletHandler) ImportByPrivateKey(args WalletImportArgs, resp *st
 	if err != nil {
 		return xfsgo.NewRPCErrorCause(-6001, err)
 	}
-	*resp = addr.B58String()
+	respstr := addr.B58String()
+	*resp = &respstr
 	return nil
 }
 
-func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *string) error {
+func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp **string) error {
 	var (
 		err   error
 		stdTx = new(xfsgo.StdTransaction)
@@ -257,6 +260,7 @@ func (handler *WalletHandler) SendTransaction(args SendTransactionArgs, resp *st
 		return xfsgo.NewRPCErrorCause(-1006, err)
 	}
 	result := tx.Hash()
-	*resp = result.Hex()
+	resulthex := result.Hex()
+	*resp = &resulthex
 	return nil
 }

@@ -41,9 +41,10 @@ type GetBalanceArgs struct {
 
 type GetStorageAtArgs struct {
 	RootHash string `json:"root_hash"`
-    Key      string `json:"key"`
+	Key      string `json:"key"`
 }
-func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) error {
+
+func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp **string) error {
 	var rootHash common.Hash
 	if args.RootHash == "" {
 		rootHash = state.BlockChain.CurrentBHeader().StateRoot
@@ -71,10 +72,11 @@ func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) erro
 	data := stateTree.GetStateObj(address)
 
 	if data == (&xfsgo.StateObj{}) || data == nil || data.GetBalance() == nil {
-		*resp = "0"
+		**resp = "0"
 		return nil
 	}
-	*resp = data.GetBalance().String()
+	respstring := data.GetBalance().String()
+	*resp = &respstring
 	return nil
 
 }
@@ -107,32 +109,32 @@ func (state *StateAPIHandler) GetAccount(args GetAccountArgs, resp **StateObjRes
 }
 
 func (state *StateAPIHandler) GetStorageAt(args GetStorageAtArgs, resp **string) error {
-    if args.RootHash == "" {
-        return xfsgo.NewRPCError(-32601, "Require storage root hash")
-    }
-    rootHashBytes, err := common.HexToBytes(args.RootHash)
-    if err != nil {
-        return xfsgo.NewRPCErrorCause(-32001, err)
-    }
-    stateTree, err := avlmerkle.NewTreeN(state.StateDb, rootHashBytes)
-    if err != nil {
-        return xfsgo.NewRPCError(-32001, 
-            fmt.Sprintf("Notfound root hash: 0x%x", rootHashBytes))
-    }
-    keyBytes, err := common.HexToBytes(args.Key)
-    if err != nil {
-        return xfsgo.NewRPCErrorCause(-32001, err)
-    }
-    val, exists := stateTree.Get(keyBytes)
-    if !exists {
-        return xfsgo.NewRPCError(-32601,
-            fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
-    }
-    outhex := common.BytesToHexString(val)
-    if outhex == "" {
-        return xfsgo.NewRPCError(-32601,
-            fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
-    }
-    *resp = &outhex
-    return nil
+	if args.RootHash == "" {
+		return xfsgo.NewRPCError(-32601, "Require storage root hash")
+	}
+	rootHashBytes, err := common.HexToBytes(args.RootHash)
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32001, err)
+	}
+	stateTree, err := avlmerkle.NewTreeN(state.StateDb, rootHashBytes)
+	if err != nil {
+		return xfsgo.NewRPCError(-32001,
+			fmt.Sprintf("Notfound root hash: 0x%x", rootHashBytes))
+	}
+	keyBytes, err := common.HexToBytes(args.Key)
+	if err != nil {
+		return xfsgo.NewRPCErrorCause(-32001, err)
+	}
+	val, exists := stateTree.Get(keyBytes)
+	if !exists {
+		return xfsgo.NewRPCError(-32601,
+			fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
+	}
+	outhex := common.BytesToHexString(val)
+	if outhex == "" {
+		return xfsgo.NewRPCError(-32601,
+			fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
+	}
+	*resp = &outhex
+	return nil
 }

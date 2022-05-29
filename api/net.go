@@ -28,7 +28,7 @@ func (net *NetAPIHandler) GetPeers(_ EmptyArgs, resp *[]string) error {
 	return nil
 }
 
-func (net *NetAPIHandler) AddPeer(args AddPeerArgs, resp *string) error {
+func (net *NetAPIHandler) AddPeer(args AddPeerArgs, resp **string) error {
 	if args.Url == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -40,7 +40,7 @@ func (net *NetAPIHandler) AddPeer(args AddPeerArgs, resp *string) error {
 	return nil
 }
 
-func (net *NetAPIHandler) DelPeer(args DelPeerArgs, resp *interface{}) error {
+func (net *NetAPIHandler) DelPeer(args DelPeerArgs, resp **interface{}) error {
 	if args.Id == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -52,8 +52,8 @@ func (net *NetAPIHandler) DelPeer(args DelPeerArgs, resp *interface{}) error {
 	return nil
 }
 
-func (net *NetAPIHandler) GetNodeId(_ EmptyArgs, resp *string) error {
+func (net *NetAPIHandler) GetNodeId(_ EmptyArgs, resp **string) error {
 	nodeid := net.NetServer.NodeId().String()
-	*resp = nodeid
+	*resp = &nodeid
 	return nil
 }

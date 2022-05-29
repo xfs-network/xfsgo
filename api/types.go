@@ -169,6 +169,7 @@ func coverTxs2Resp(pending []*xfsgo.Transaction, dst **TransactionsResp) error {
 
 func coverBlock2Resp(block *xfsgo.Block, dst **BlockResp) error {
 	if block == nil {
+		*&dst = nil
 		return nil
 	}
 	result := new(BlockResp)
@@ -196,9 +197,10 @@ func coverBlock2Resp(block *xfsgo.Block, dst **BlockResp) error {
 
 func coverBlockHeader2Resp(block *xfsgo.Block, dst **BlockHeaderResp) error {
 	if block == nil {
+		*dst = nil
 		return nil
 	}
-	if err := common.Objcopy(block.Header, &dst); err != nil {
+	if err := common.Objcopy(block.Header, dst); err != nil {
 		return err
 	}
 	result := *dst
@@ -208,6 +210,7 @@ func coverBlockHeader2Resp(block *xfsgo.Block, dst **BlockHeaderResp) error {
 
 func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 	if tx == nil {
+		*dst = nil
 		return nil
 	}
 	if err := common.Objcopy(tx, &dst); err != nil {
@@ -229,6 +232,7 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 }
 func coverReceipt(src *ReceiptResp, dst **ReceiptResp) error {
 	if src == nil {
+		*dst = nil
 		return nil
 	}
 	return common.Objcopy(src, &dst)
@@ -236,6 +240,7 @@ func coverReceipt(src *ReceiptResp, dst **ReceiptResp) error {
 
 func coverState2Resp(state *xfsgo.StateObj, dst **StateObjResp) error {
 	if state == nil {
+		*dst = nil
 		return nil
 	}
 	result := new(StateObjResp)

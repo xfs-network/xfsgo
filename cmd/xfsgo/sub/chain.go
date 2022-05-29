@@ -94,7 +94,7 @@ func getHead() error {
 	}
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	var block *common.BlocksMap
-	err = cli.CallMethod(1, "Chain.Head", nil, &block)
+	err = cli.CallMethod(1, "Chain.GetHead", nil, &block)
 	if err != nil {
 		return err
 	}

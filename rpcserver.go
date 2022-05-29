@@ -17,17 +17,16 @@
 package xfsgo
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"go/token"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"reflect"
-	"strconv"
 	"strings"
 	"xfsgo/log"
 
@@ -39,36 +38,44 @@ const (
 	jsonrpcVersion = "2.0"
 )
 
-var (
-	//parseError          = NewRPCError(-32700, "parse error")
-	invalidRequestError = NewRPCError(-32600, "invalid request")
-	methodNotFoundError = NewRPCError(-32601, "method not found")
-	//invalidParamsError = NewRPCError(-32602, "invalid params")
-	//internalError = NewRPCError(-32603, "invalid params")
-)
+type RPCConn interface {
+	SendMessage(uuid.UUID, interface{}) error
+	SetCloseHandler(h func(code int, text string) error)
+}
+type rpcConn struct {
+	conn    *websocket.Conn
+	request *RPCMessageRequest
+}
 
-type methodType struct {
+func (c *rpcConn) SendMessage(id uuid.UUID, data interface{}) error {
+	msg := &RPCBroadcastMsg{
+		Jsonrpc:      jsonrpcVersion,
+		Id:           c.request.Id,
+		Result:       data,
+		Subscription: id.String(),
+	}
+	return sendWSRPCResponse(c.conn, msg)
+}
+
+func (c *rpcConn) SetCloseHandler(h func(code int, text string) error) {
+	if h != nil {
+		c.conn.SetCloseHandler(h)
+	}
+}
+
+type method struct {
 	method    reflect.Method
+	argc      uint
 	ArgType   reflect.Type
 	ReplyType reflect.Type
-	numCalls  uint
 }
 
 type service struct {
-	name    string
-	rcvr    reflect.Value
-	typ     reflect.Type
-	methods map[string]*methodType
-}
-type jsonRPCObj struct {
-	jsonrpc string
-	id      *int
-	method  string
-	params  interface{}
-}
-type jsonRPCRespErr struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	name         string
+	rcvr         reflect.Value
+	typ          reflect.Type
+	methods      map[string]*method
+	isSubscriber bool
 }
 
 type RPCConfig struct {
@@ -133,89 +140,10 @@ func NewRPCServer(config *RPCConfig) *RPCServer {
 	return server
 }
 
-func (s *service) callMethod(mtype *methodType, params interface{}) (interface{}, error) {
-	function := mtype.method.Func
-	argIsValue := false
-	var argv reflect.Value
-	if mtype.ArgType.Kind() == reflect.Ptr {
-		argv = reflect.New(mtype.ArgType.Elem())
-	} else {
-		argv = reflect.New(mtype.ArgType)
-		argIsValue = true
-	}
-
-	if argIsValue {
-		argv = argv.Elem()
-	}
-	if params != nil {
-		tk := reflect.TypeOf(params).Kind()
-		switch tk {
-		case reflect.Slice:
-			paramsArr, _ := params.([]interface{})
-			if len(paramsArr) != argv.NumField() {
-				return nil, NewRPCError(-32602, "Invalid params")
-			}
-			for i := 0; i < argv.NumField(); i++ {
-				if paramsArr[i] == nil {
-					continue
-				}
-				paramsvalue := reflect.ValueOf(paramsArr[i])
-				argv.Field(i).Set(paramsvalue)
-			}
-		case reflect.Map:
-			paramsMap := params.(map[string]interface{})
-			for i := 0; i < argv.NumField(); i++ {
-				fieldInfo := argv.Type().Field(i) // a reflect.StructField
-				tag := fieldInfo.Tag              // a reflect.StructTag
-				name := tag.Get("json")
-				if name == "" {
-					name = strings.ToLower(fieldInfo.Name)
-				}
-				name = strings.Split(name, ",")[0] //json Tag
-
-				// Support basic types
-				if value, ok := paramsMap[name]; ok {
-					if reflect.ValueOf(value).Type() == argv.FieldByName(fieldInfo.Name).Type() {
-						argv.FieldByName(fieldInfo.Name).Set(reflect.ValueOf(value))
-					} else {
-						if val, ok := reflect.ValueOf(value).Interface().(json.Number); ok {
-							value, err := val.Int64()
-							if err != nil {
-								return nil, err
-							}
-							data := int(value)
-							if argv.FieldByName(fieldInfo.Name).Type() == reflect.TypeOf(data) {
-								argv.FieldByName(fieldInfo.Name).Set(reflect.ValueOf(data))
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	replyv := reflect.New(mtype.ReplyType.Elem())
-	switch mtype.ReplyType.Elem().Kind() {
-	case reflect.Map:
-		replyv.Elem().Set(reflect.MakeMap(mtype.ReplyType.Elem()))
-	case reflect.Slice:
-		replyv.Elem().Set(reflect.MakeSlice(mtype.ReplyType.Elem(), 0, 0))
-	}
-	returnValues := function.Call([]reflect.Value{s.rcvr, argv, replyv})
-	errInter := returnValues[0].Interface()
-	if errInter != nil {
-		e := errInter.(error)
-		return nil, e
-	}
-	return replyv.Interface(), nil
-}
-func (server *RPCServer) Register(rcvr interface{}) error {
-	return server.register(rcvr, "", false)
-}
-
 // RegisterName creates a service for the given receiver type under the given name and added it to the
 // service collection this server provides to clients.
 func (server *RPCServer) RegisterName(name string, rcvr interface{}) error {
-	return server.register(rcvr, name, true)
+	return server.register(rcvr, name, true, false)
 }
 func isExportedOrBuiltinType(t reflect.Type) bool {
 	for t.Kind() == reflect.Ptr {
@@ -228,24 +156,41 @@ func isExportedOrBuiltinType(t reflect.Type) bool {
 
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
 
-func suitableMethods(typ reflect.Type) map[string]*methodType {
-	methods := make(map[string]*methodType)
-	for m := 0; m < typ.NumMethod(); m++ {
-		method := typ.Method(m)
-		mtype := method.Type
-		mname := method.Name
-		if method.PkgPath != "" {
+var typeOfRPCConn = reflect.TypeOf((*RPCConn)(nil)).Elem()
+
+func suitableMethods(objType reflect.Type, isSubscriber bool) map[string]*method {
+	methods := make(map[string]*method)
+	for i := 0; i < objType.NumMethod(); i++ {
+		methodN := objType.Method(i)
+		mtype := methodN.Type
+		mname := methodN.Name
+		if !methodN.IsExported() {
 			continue
 		}
-		if mtype.NumIn() != 3 {
+		if mtype.NumIn() != 4 && isSubscriber {
+			continue
+		} else if !isSubscriber && mtype.NumIn() != 3 {
 			continue
 		}
-		argType := mtype.In(1)
+		var argType reflect.Type
+		var replyType reflect.Type
+		if isSubscriber {
+			if connType := mtype.In(1); connType != typeOfRPCConn {
+				continue
+			}
+			argType = mtype.In(2)
+			replyType = mtype.In(3)
+		} else {
+			argType = mtype.In(1)
+			replyType = mtype.In(2)
+		}
 		if !isExportedOrBuiltinType(argType) {
 			continue
 		}
-		replyType := mtype.In(2)
 		if replyType.Kind() != reflect.Ptr {
+			continue
+		}
+		if !isExportedOrBuiltinType(replyType) {
 			continue
 		}
 		if mtype.NumOut() != 1 {
@@ -254,8 +199,8 @@ func suitableMethods(typ reflect.Type) map[string]*methodType {
 		if returnType := mtype.Out(0); returnType != typeOfError {
 			continue
 		}
-		methods[mname] = &methodType{
-			method:    method,
+		methods[mname] = &method{
+			method:    methodN,
 			ArgType:   argType,
 			ReplyType: replyType,
 		}
@@ -263,128 +208,29 @@ func suitableMethods(typ reflect.Type) map[string]*methodType {
 	return methods
 
 }
-func (server *RPCServer) register(rcvr interface{}, name string, useName bool) error {
+func (server *RPCServer) register(rcvr interface{}, name string, useName bool, isSubscriber bool) error {
 	s := new(service)
 	s.typ = reflect.TypeOf(rcvr)
 	s.rcvr = reflect.ValueOf(rcvr)
-	sname := reflect.Indirect(s.rcvr).Type().Name()
-	if useName {
-		sname = name
+	sname := name
+	if !useName {
+		sname = reflect.Indirect(s.rcvr).Type().Name()
 	}
 	if sname == "" {
-		return fmt.Errorf("rpc.Register: no service name for type %s", s.typ.String())
+		return fmt.Errorf("rpc register: no service name for type %s", s.typ.String())
 	}
-	if !token.IsExported(sname) && !useName {
-		return fmt.Errorf("rpc.Register: type %s is not exported", sname)
+	if !useName && !token.IsExported(sname) {
+		return fmt.Errorf("rpc register: type %s is not exported", sname)
 	}
 	s.name = sname
-	s.methods = suitableMethods(s.typ)
-	server.serviceMap[sname] = s
-
+	s.isSubscriber = isSubscriber
+	s.methods = suitableMethods(s.typ, isSubscriber)
+	server.serviceMap[s.name] = s
 	return nil
 }
+func (server *RPCServer) RegisterSubscribe(name string, obj interface{}) error {
+	return server.register(obj, name, true, true)
 
-func (server *RPCServer) getServiceAndMethodType(pack string) (*service, *methodType, error) {
-	mpake := strings.Split(pack, ".")
-	if len(mpake) != 2 {
-		return nil, nil, methodNotFoundError
-	}
-	mService := server.serviceMap[mpake[0]]
-	if mService == nil {
-		return nil, nil, methodNotFoundError
-	}
-	mtype := mService.methods[mpake[1]]
-	if mtype == nil {
-		return nil, nil, methodNotFoundError
-	}
-	return mService, mtype, nil
-}
-
-func (server *RPCServer) parseJsonRPCObj(jsonObjMap map[string]interface{}, obj *jsonRPCObj) error {
-	idNumber, ok := jsonObjMap["id"].(json.Number)
-	if !ok {
-		return invalidRequestError
-	}
-	idNumberStr := idNumber.String()
-	id, err := strconv.Atoi(idNumberStr)
-	if err != nil {
-		return NewRPCError(-32600, err.Error())
-	}
-
-	obj.id = &id
-	version, ok := jsonObjMap["jsonrpc"].(string)
-	if !ok || version != "2.0" {
-		return invalidRequestError
-	}
-	obj.jsonrpc = version
-	methodPack, ok := jsonObjMap["method"].(string)
-	if !ok {
-		return invalidRequestError
-	}
-	obj.method = methodPack
-	obj.params = jsonObjMap["params"]
-	return nil
-}
-
-func (server *RPCServer) jsonRPCCall(data []byte, rpcId **int, w io.Writer) error {
-	var personFromJSON interface{}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	_ = decoder.Decode(&personFromJSON)
-
-	jsonObjMap := personFromJSON.(map[string]interface{})
-	rpcObj := &jsonRPCObj{}
-	if err := server.parseJsonRPCObj(jsonObjMap, rpcObj); err != nil {
-		*rpcId = *&rpcObj.id
-		return err
-	}
-	*rpcId = *&rpcObj.id
-	s, t, err := server.getServiceAndMethodType(rpcObj.method)
-	if err != nil {
-		return err
-	}
-
-	_, ok := rpcObj.params.(map[string]interface{})
-	if ok {
-		if len(rpcObj.params.(map[string]interface{})) == 0 {
-			rpcObj.params = nil
-		}
-	}
-
-	rec, err := s.callMethod(t, rpcObj.params)
-	if err != nil {
-		return err
-	}
-	outMap := make(map[string]interface{})
-	outMap["jsonrpc"] = jsonrpcVersion
-	outMap["id"] = rpcObj.id
-	outMap["result"] = rec
-	outBytes, _ := json.Marshal(outMap)
-	_, _ = w.Write(outBytes)
-	return nil
-}
-
-func httperr(c *gin.Context, status int, err error) {
-	c.String(status, "%s", err)
-	c.Abort()
-}
-
-func writeRPCError(err error, reqId *int, w io.Writer) {
-	rpcErr, isRPCErr := err.(*RPCError)
-	e := jsonRPCRespErr{}
-	if !isRPCErr {
-		e.Code = -32603
-		e.Message = "internal error"
-	} else {
-		e.Code = rpcErr.Code
-		e.Message = rpcErr.Message
-	}
-	outMap := make(map[string]interface{})
-	outMap["jsonrpc"] = jsonrpcVersion
-	outMap["id"] = reqId
-	outMap["error"] = e
-	outBytes, _ := json.Marshal(outMap)
-	_, _ = w.Write(outBytes)
 }
 
 func isWebsocketRequest(c *gin.Context) bool {
@@ -393,70 +239,186 @@ func isWebsocketRequest(c *gin.Context) bool {
 	return connection == "Upgrade" && upgrade == "websocket"
 }
 func (server *RPCServer) handleWebsocket(c *gin.Context) error {
+	server.upgrader.CheckOrigin = func(r *http.Request) bool {
+		return true
+	}
 	conn, err := server.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		logrus.Warnf("upgrad err: %s", err)
+		return err
+	}
+	server.readLoop(conn)
+	return nil
+}
+
+type RPCMessageRequest struct {
+	Jsonrpc string          `json:"jsonrpc"`
+	Id      interface{}     `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+type RPCMessageRespSuccess struct {
+	Jsonrpc string      `json:"jsonrpc"`
+	Id      interface{} `json:"id"`
+	Result  interface{} `json:"result"`
+}
+
+type RPCMessageError struct {
+	Jsonrpc string              `json:"jsonrpc"`
+	Id      interface{}         `json:"id"`
+	Error   *RPCMessageErrorObj `json:"error"`
+}
+
+type RPCBroadcastMsg struct {
+	Jsonrpc      string      `json:"jsonrpc"`
+	Id           interface{} `json:"id"`
+	Result       interface{} `json:"result"`
+	Subscription string      `json:"subscription"`
+}
+
+type RPCMessageErrorObj struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func sendRPCResponse(writer io.WriteCloser, resp interface{}) error {
+	raw, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}
+	_, err = writer.Write(raw)
+	if err != nil {
+		return err
+	}
+	return writer.Close()
+}
+
+func sendWSRPCResponse(conn *websocket.Conn, resp interface{}) error {
+	w, err := conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return err
+	}
+	return sendRPCResponse(w, resp)
+}
+
+func sendWSRPCError(conn *websocket.Conn, id interface{}, err error) error {
+	errobj := packErrorMessage(id, err)
+	return sendWSRPCResponse(conn, errobj)
+}
+func (server *RPCServer) readLoop(conn *websocket.Conn) {
+	defer func() {
+		if conn == nil {
+			return
+		}
+		if err := conn.Close(); err != nil {
+			logrus.Warnf("websocket close err: %s", err)
+		}
+	}()
+	conn.SetPingHandler(nil)
+	conn.SetPongHandler(nil)
+	conn.SetCloseHandler(nil)
 	for {
-		t, msg, err := conn.ReadMessage()
+		_, data, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
-		if t != websocket.TextMessage {
+		var request *RPCMessageRequest
+		if err = json.Unmarshal(data, &request); err == nil {
+			var replay interface{}
+			if err = server.gotRPCRequestReply(request, &replay, &rpcConn{
+				request: request,
+				conn:    conn,
+			}); err != nil {
+				_ = sendWSRPCError(conn, request.Id, err)
+				continue
+			}
+			data := &RPCMessageRespSuccess{
+				Jsonrpc: jsonrpcVersion,
+				Id:      request.Id,
+				Result:  replay,
+			}
+			_ = sendWSRPCResponse(conn, data)
 			continue
 		}
-		//msgText := string(msg)
-
-		bs := bytes.NewBuffer(nil)
-		var rpcId *int
-		if err = server.jsonRPCCall(msg, &rpcId, bs); err != nil {
-			writeRPCError(err, nil, bs)
-		}
-		if err = conn.WriteMessage(t, bs.Bytes()); err != nil {
-			continue
-		}
+		_ = sendWSRPCError(conn, nil, parseError)
 	}
-	return nil
+}
+func sendHTTPRPCResponse(c *gin.Context, code int, data interface{}) {
+	c.JSON(code, data)
+}
+
+func packErrorMessage(id interface{}, err error) *RPCMessageError {
+	var errorCode int
+	var errorMessage string
+	if err == nil {
+		errorCode = internalError.Code
+		errorMessage = internalError.Message
+	} else if rpcerr, ok := err.(*rpcError); ok {
+		errorCode = rpcerr.Code
+		errorMessage = rpcerr.Message
+	} else {
+		errorCode = internalError.Code
+		errorMessage = err.Error()
+	}
+	msg := &RPCMessageError{
+		Jsonrpc: jsonrpcVersion,
+		Id:      id,
+		Error:   &RPCMessageErrorObj{Code: errorCode, Message: errorMessage},
+	}
+	return msg
+}
+func sendHTTPRPCError(c *gin.Context, code int, id interface{}, err error) {
+	msg := packErrorMessage(id, err)
+	sendHTTPRPCResponse(c, code, msg)
 }
 
 //Start starts rpc server.
 func (server *RPCServer) Start() error {
 	server.ginEngine.Any("/", func(c *gin.Context) {
 		//handle websocket request
+		defer c.Abort()
 		if isWebsocketRequest(c) {
 			if err := server.handleWebsocket(c); err != nil {
 				server.logger.Warnf("ws connect err")
 			}
-			c.Abort()
 			return
 		}
+		c.Header("Content-Type", "application/json; charset=utf-8")
 		if "POST" != c.Request.Method {
-			httperr(c, 404, errors.New("method not allowed"))
+			sendHTTPRPCError(c, 400, nil, invalidRequestError)
 			return
 		}
 		contentType := c.ContentType()
 		if contentType != "application/json" {
-			httperr(c, 404, errors.New("not acceptable"))
+			sendHTTPRPCError(c, 400, nil, invalidRequestError)
 			return
 		}
 		if nil == c.Request.Body {
-			httperr(c, 404, errors.New("body not be empty"))
+			sendHTTPRPCError(c, 400, nil, invalidRequestError)
 			return
 		}
 		body, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
-			httperr(c, 500, fmt.Errorf("read body err: %s", err))
+			sendHTTPRPCError(c, 400, nil, parseError)
 			return
 		}
-		c.Status(200)
-		c.Header("Content-Type", "application/json; charset=utf-8")
-		var rpcId *int = nil
-
-		if err = server.jsonRPCCall(body, &rpcId, c.Writer); err != nil {
-			writeRPCError(err, rpcId, c.Writer)
+		var request *RPCMessageRequest
+		if err = json.Unmarshal(body, &request); err == nil {
+			var replay interface{}
+			if err = server.gotRPCRequestReply(request, &replay, nil); err != nil {
+				sendHTTPRPCError(c, 200, request.Id, err)
+				return
+			}
+			data := &RPCMessageRespSuccess{
+				Jsonrpc: jsonrpcVersion,
+				Id:      request.Id,
+				Result:  replay,
+			}
+			sendHTTPRPCResponse(c, 200, data)
 			return
 		}
-		c.Abort()
+		sendHTTPRPCError(c, 400, nil, parseError)
 	})
 
 	ln, err := net.Listen("tcp", server.config.ListenAddr)
@@ -465,4 +427,101 @@ func (server *RPCServer) Start() error {
 	}
 	server.logger.Infof("RPC Service listen on: %s", ln.Addr())
 	return server.ginEngine.RunListener(ln)
+}
+func (server *RPCServer) readRequest(request *RPCMessageRequest) (
+	s *service, m *method, argv reflect.Value, replyv reflect.Value, err error) {
+	if request.Method == "" {
+		err = methodNotFoundError
+		return
+	}
+	dot := strings.LastIndex(request.Method, ".")
+	if dot < 0 {
+		err = methodNotFoundError
+		return
+	}
+	serviceName := request.Method[:dot]
+	methodName := request.Method[dot+1:]
+	s, existsService := server.serviceMap[serviceName]
+	if !existsService {
+		err = methodNotFoundError
+		return
+	}
+	m, existsMethod := s.methods[methodName]
+	if !existsMethod {
+		err = methodNotFoundError
+		return
+	}
+	argTypeKind := m.ArgType.Kind()
+	argIsValue := false
+	if argTypeKind == reflect.Ptr {
+		argv = reflect.New(m.ArgType.Elem())
+	} else {
+		argv = reflect.New(m.ArgType)
+		argIsValue = true
+	}
+	err = json.Unmarshal(request.Params, argv.Interface())
+	if err != nil {
+		var params []interface{}
+		err = json.Unmarshal(request.Params, &params)
+		n := m.ArgType.NumField()
+		if len(params) != n {
+			return
+		}
+		for i := 0; i < n; i++ {
+			var field reflect.Value
+			if argIsValue {
+				field = argv.Elem().Field(i)
+			} else {
+				field = argv.Field(i)
+			}
+			field.Set(reflect.ValueOf(params[i]))
+		}
+		err = nil
+	}
+	if argIsValue {
+		argv = argv.Elem()
+	}
+	replyv = reflect.New(m.ReplyType.Elem())
+
+	switch m.ReplyType.Elem().Kind() {
+	case reflect.Map:
+		replyv.Elem().Set(reflect.MakeMap(m.ReplyType.Elem()))
+	case reflect.Slice:
+		replyv.Elem().Set(reflect.MakeSlice(m.ReplyType.Elem(), 0, 0))
+	}
+	return
+}
+
+func (s *service) call(
+	methodType *method,
+	argv reflect.Value,
+	replyv reflect.Value,
+	reply *interface{},
+	conn *rpcConn) error {
+	function := methodType.method.Func
+
+	var args []reflect.Value
+	if s.isSubscriber && conn != nil {
+		connval := reflect.ValueOf(conn)
+		args = []reflect.Value{s.rcvr, connval, argv, replyv}
+	} else if s.isSubscriber && conn == nil {
+		return internalError
+	} else {
+		args = []reflect.Value{s.rcvr, argv, replyv}
+	}
+	returnValue := function.Call(args)
+	errInter := returnValue[0].Interface()
+	replyInter := replyv.Interface()
+	*reply = replyInter
+	if returnValue[0].IsNil() {
+		return nil
+	}
+	return errInter.(error)
+}
+func (server *RPCServer) gotRPCRequestReply(request *RPCMessageRequest, reply *interface{}, conn *rpcConn) error {
+	s, m, argv, replyv, err := server.readRequest(request)
+	if err != nil {
+		return err
+	}
+	return s.call(m, argv, replyv, reply, conn)
 }

@@ -18,7 +18,7 @@ type VMCallData struct {
 	Data      string `json:"data"`
 }
 
-func (v *VMHandler) Call(args VMCallData, result *string) error {
+func (v *VMHandler) Call(args *VMCallData, result **string) error {
 	currentHeader := v.Chain.CurrentBHeader()
 	stateRoot := currentHeader.StateRoot
 	stateTree := xfsgo.NewStateTree(v.StateDb, stateRoot[:])
@@ -33,6 +33,7 @@ func (v *VMHandler) Call(args VMCallData, result *string) error {
 	if err = vmo.CallReturn(fromAddr, toAddr, data, &buffer); err != nil {
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
-	*result = common.BytesToHexString(buffer)
+	resultstring := common.BytesToHexString(buffer)
+	*result = &resultstring
 	return nil
 }

@@ -63,25 +63,26 @@ func (tx *TxPoolHandler) GetQueue(_ EmptyArgs, resp **TransactionsResp) error {
 	return coverTxs2Resp(data, resp)
 }
 
-func (tx *TxPoolHandler) GetPendingSize(_ EmptyArgs, resp *int) error {
+func (tx *TxPoolHandler) GetPendingSize(_ EmptyArgs, resp **int) error {
 	data := tx.TxPool.GetPendingTxsSize()
-	*resp = data
+	*resp = &data
 	return nil
 }
 
-func (tx *TxPoolHandler) GetQueueSize(_ EmptyArgs, resp *int) error {
+func (tx *TxPoolHandler) GetQueueSize(_ EmptyArgs, resp **int) error {
 	data := tx.TxPool.GetQueueSize()
-	*resp = data
+	*resp = &data
 	return nil
 }
 
-func (tx *TxPoolHandler) GetTxPoolSize(_ EmptyArgs, resp *int) error {
+func (tx *TxPoolHandler) GetTxPoolSize(_ EmptyArgs, resp **int) error {
 	data := tx.TxPool.GetTxPoolSize()
-	*resp = int(data)
+	respInt := int(data)
+	*resp = &respInt
 	return nil
 }
 
-func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp *string) error {
+func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp **string) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -93,12 +94,12 @@ func (tx *TxPoolHandler) RemoveTx(args RemoveTxHashArgs, resp *string) error {
 	return nil
 }
 
-func (tx *TxPoolHandler) Clear(_ EmptyArgs, resp *string) error {
+func (tx *TxPoolHandler) Clear(_ EmptyArgs, resp **string) error {
 	tx.TxPool.RemoveTransactions(tx.TxPool.GetPendingTxs())
 	return nil
 }
 
-func (tx *TxPoolHandler) RemoveQueues(_ EmptyArgs, resp *string) error {
+func (tx *TxPoolHandler) RemoveQueues(_ EmptyArgs, resp **string) error {
 	tx.TxPool.RemoveTransactions(tx.TxPool.GetQueues())
 	return nil
 }
@@ -115,7 +116,7 @@ func (tx *TxPoolHandler) GetTranByHash(args GetTranByHashArgs, resp **Transactio
 	return coverTx2Resp(tranObj, resp)
 }
 
-func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *int64) error {
+func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp **int64) error {
 	if args.Address == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
 	}
@@ -125,12 +126,12 @@ func (tx *TxPoolHandler) GetAddrTxNonce(args GetAddrNonceByHashArgs, resp *int64
 		return xfsgo.NewRPCErrorCause(-32001, fmt.Errorf("failed to verify 'from' address: %s", addr))
 	}
 	nonce := state.GetNonce(addr)
-
-	*resp = int64(nonce)
+	respInt := int64(nonce)
+	*resp = &respInt
 	return nil
 }
 
-func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *string) error {
+func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp **string) error {
 	if args.Data == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter data cannot be empty")
 	}
@@ -153,6 +154,7 @@ func (tx *TxPoolHandler) SendRawTransaction(args RawTransactionArgs, resp *strin
 		return xfsgo.NewRPCErrorCause(-32001, err)
 	}
 	txhash := txdata.Hash()
-	*resp = txhash.Hex()
+	respstring := txhash.Hex()
+	*resp = &respstring
 	return nil
 }

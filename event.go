@@ -38,6 +38,14 @@ type Subscription struct {
 func (s *Subscription) Chan() chan interface{} {
 	return s.c
 }
+func (s *Subscription) AddLListener(listener func(subscription *Subscription, data interface{})) {
+	for {
+		select {
+		case d := <-s.c:
+			go listener(s, d)
+		}
+	}
+}
 
 func (s *Subscription) Unsubscribe() {
 	s.eb.unsubscribe(s.typ, s.index)

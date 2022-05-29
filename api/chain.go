@@ -154,7 +154,7 @@ func (handler *ChainAPIHandler) GetBlockHashes(args GetBlockHashesArgs, resp *[]
 // 	return coverBlocks2Resp(gotBlocks, resp)
 // }
 
-func (handler *ChainAPIHandler) Head(_ EmptyArgs, resp **BlockHeaderResp) error {
+func (handler *ChainAPIHandler) GetHead(_ EmptyArgs, resp **BlockHeaderResp) error {
 	gotBlock := handler.BlockChain.GetHead()
 	return coverBlockHeader2Resp(gotBlock, resp)
 }
@@ -277,7 +277,7 @@ func (handler *ChainAPIHandler) GetTransaction(args GetTransactionArgs, resp **T
 // - startingBlock: block number this node started to synchronise from
 // - currentBlock:  block number this node is currently importing
 // - highestBlock:  block number of the highest block header this node has received from peers
-func (handler *ChainAPIHandler) GetSyncStatus(_ EmptyArgs, resp *ChainStatusResp) error {
+func (handler *ChainAPIHandler) GetSyncStatus(_ EmptyArgs, resp **ChainStatusResp) error {
 	current := handler.BlockChain.CurrentBHeader().Height
 	origin, height := handler.BlockChain.Boundaries()
 
@@ -296,12 +296,12 @@ func (handler *ChainAPIHandler) GetSyncStatus(_ EmptyArgs, resp *ChainStatusResp
 	result.CurrentBlock = new(big.Int).SetUint64(current).Text(10)
 	result.HighestBlock = new(big.Int).SetUint64(height).Text(10)
 
-	*resp = *result
+	*resp = result
 
 	return nil
 }
 
-func (handler *ChainAPIHandler) ExportBlocks(args GetBlocksByRangeArgs, resp *string) error {
+func (handler *ChainAPIHandler) ExportBlocks(args GetBlocksByRangeArgs, resp **string) error {
 
 	var numbersForm, numbersCount *big.Int
 	var ok bool
@@ -348,12 +348,12 @@ func (handler *ChainAPIHandler) ExportBlocks(args GetBlocksByRangeArgs, resp *st
 	bt.WriteString(key)
 	bt.WriteString(encryption)
 	respStr := bt.String()
-	*resp = respStr
+	*resp = &respStr
 	return nil
 
 }
 
-func (handler *ChainAPIHandler) ImportBlock(args GetBlocksArgs, resp *string) error {
+func (handler *ChainAPIHandler) ImportBlock(args GetBlocksArgs, resp **string) error {
 	if args.Blocks == "" {
 		return xfsgo.NewRPCError(-1006, "to Blocks file path not be empty")
 	}
@@ -381,7 +381,8 @@ func (handler *ChainAPIHandler) ImportBlock(args GetBlocksArgs, resp *string) er
 			continue
 		}
 	}
-	*resp = "Import complete"
+	respstring := "Import complete"
+	*resp = &respstring
 	return nil
 }
 
@@ -391,7 +392,7 @@ func (handler *ChainAPIHandler) ProgressBar(_ EmptyArgs, resp *string) error {
 	return nil
 }
 
-func (handler *ChainAPIHandler) GetBlockTxCountByHash(args GetBlockTxCountByHashArgs, resp *int) error {
+func (handler *ChainAPIHandler) GetBlockTxCountByHash(args GetBlockTxCountByHashArgs, resp **int) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -400,7 +401,7 @@ func (handler *ChainAPIHandler) GetBlockTxCountByHash(args GetBlockTxCountByHash
 	}
 	gotBlock := handler.BlockChain.GetBlockByHash(common.Hex2Hash(args.Hash))
 	result := len(gotBlock.Transactions)
-	*resp = result
+	*resp = &result
 	return nil
 }
 
@@ -418,7 +419,7 @@ func (handler *ChainAPIHandler) GetBlockTxCountByNum(args GetBlockTxCountByNumAr
 	return nil
 }
 
-func (handler *ChainAPIHandler) GetBlockTxByHashAndIndex(args GetBlockTxByHashAndIndexArgs, resp *TransactionResp) error {
+func (handler *ChainAPIHandler) GetBlockTxByHashAndIndex(args GetBlockTxByHashAndIndexArgs, resp **TransactionResp) error {
 	if args.Hash == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -433,10 +434,10 @@ func (handler *ChainAPIHandler) GetBlockTxByHashAndIndex(args GetBlockTxByHashAn
 		return xfsgo.NewRPCError(-1006, "Block not found, the index transaction")
 	}
 	tx := gotBlock.Transactions[args.Index]
-	return coverTx2Resp(tx, &resp)
+	return coverTx2Resp(tx, resp)
 }
 
-func (handler *ChainAPIHandler) GetBlockTxByNumAndIndex(args GetBlockTxByNumAndIndexArgs, resp *TransactionResp) error {
+func (handler *ChainAPIHandler) GetBlockTxByNumAndIndex(args GetBlockTxByNumAndIndexArgs, resp **TransactionResp) error {
 	if args.Number == "" {
 		return xfsgo.NewRPCError(-1006, "Parameter cannot be empty")
 	}
@@ -450,7 +451,7 @@ func (handler *ChainAPIHandler) GetBlockTxByNumAndIndex(args GetBlockTxByNumAndI
 		return xfsgo.NewRPCError(-1006, "Block not found, the index transaction")
 	}
 	tx := gotBlock.Transactions[args.Index]
-	return coverTx2Resp(tx, &resp)
+	return coverTx2Resp(tx, resp)
 }
 
 type GetLogsRequest struct {
@@ -469,7 +470,7 @@ type EventLogResp struct {
 	Address         common.Address `json:"address"`
 }
 
-func coverEventObjToReps(src []*vm.EventObj, dst **[]*EventLogResp) error {
+func coverEventObjToReps(src []*vm.EventObj, dst *[]*EventLogResp) error {
 	for _, srcv := range src {
 		resp := &EventLogResp{
 			BlockHeight:     srcv.BlockHeight,
@@ -479,7 +480,7 @@ func coverEventObjToReps(src []*vm.EventObj, dst **[]*EventLogResp) error {
 			Address:         srcv.Address,
 		}
 		resp.EventValue = common.BytesToHexString(srcv.EventValue)
-		**dst = append(**dst, resp)
+		*dst = append(*dst, resp)
 	}
 	return nil
 }
@@ -529,5 +530,5 @@ func (handler *ChainAPIHandler) GetLogs(args GetLogsRequest, resp *[]*EventLogRe
 			}
 		}
 	}
-	return coverEventObjToReps(events, &resp)
+	return coverEventObjToReps(events, resp)
 }

@@ -33,11 +33,9 @@ func (l *logger) Event(e interface{}) {
 	}
 	etype := reflect.TypeOf(e)
 	etypename := etype.Name()
-	namehash := ahash.SHA256([]byte(etypename))
-	finally := append(namehash, data...)
-	finallyHash := ahash.SHA256Array(finally)
+	namehash := ahash.SHA256Array([]byte(etypename))
 	l.events = append(l.events, Event{
-		Hash:  finallyHash,
+		Hash:  namehash,
 		Value: data,
 	})
 }

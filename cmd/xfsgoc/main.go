@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"reflect"
 	"xfsgo/common"
@@ -83,26 +82,6 @@ func init() {
 	flag.BoolVar(&isAbi, "abi", false, "")
 	flag.BoolVar(&isBin, "bin", false, "")
 	flag.StringVar(&outfile, "out", "", "")
-}
-
-func packStdTokenParams(t *StdToken) ([]byte, error) {
-	buffer := vm.NewBuffer(nil)
-	_ = buffer.WriteString(t.Name)
-	_ = buffer.WriteString(t.Symbol)
-	n := t.Decimals >> 8
-	if n != 0 {
-		return nil, fmt.Errorf("decimals value must be uint8")
-	}
-	ub := [1]byte{byte(t.Decimals)}
-	_, _ = buffer.Write(ub[:])
-	bigTotalSupply := new(big.Int)
-	bigTotalSupply, ok := bigTotalSupply.SetString(t.TotalSupply, 10)
-	if !ok {
-		return nil, fmt.Errorf("Failed parse totalSupply")
-	}
-	totalSupplyU256 := vm.NewUint256(bigTotalSupply)
-	_, _ = buffer.Write(totalSupplyU256[:])
-	return buffer.Bytes(), nil
 }
 
 type BuiltinCompiler struct {
