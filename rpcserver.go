@@ -405,19 +405,41 @@ func (server *RPCServer) Start() error {
 		}
 		var request *RPCMessageRequest
 		if err = json.Unmarshal(body, &request); err == nil {
-			var replay interface{}
-			if err = server.gotRPCRequestReply(request, &replay, nil); err != nil {
+			var reply interface{}
+			if err = server.gotRPCRequestReply(request, &reply, nil); err != nil {
 				sendHTTPRPCError(c, 200, request.Id, err)
 				return
 			}
 			data := &RPCMessageRespSuccess{
 				Jsonrpc: jsonrpcVersion,
 				Id:      request.Id,
-				Result:  replay,
+				Result:  reply,
 			}
 			sendHTTPRPCResponse(c, 200, data)
 			return
 		}
+        var batchs []*RPCMessageRequest
+        if err = json.Unmarshal(body, &batchs); err == nil {
+            var resps []interface{}
+            resps = make([]interface{}, len(batchs))
+            for i := 0; i < len(batchs); i++ {
+                requestSigle := batchs[i]
+                var reply interface{}
+                var resp interface{}
+                if err = server.gotRPCRequestReply(requestSigle, &reply, nil); err != nil {
+                    resp = packErrorMessage(requestSigle.Id, err)
+                }else {
+                    resp = &RPCMessageRespSuccess{
+                        Jsonrpc: jsonrpcVersion,
+                        Id:      request.Id,
+                        Result:  reply,
+                    }
+                }
+                resps[i] = resp;
+            }
+            sendHTTPRPCResponse(c, 200, resps)
+            return
+        }
 		sendHTTPRPCError(c, 400, nil, parseError)
 	})
 
