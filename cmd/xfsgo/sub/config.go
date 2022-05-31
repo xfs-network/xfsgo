@@ -41,9 +41,9 @@ const (
 	defaultExtraDir          = "extra"
 	defaultNodesDir          = "nodes"
 	defaultLogsDir           = "logs"
-	defaultRPCClientAPIHost  = "127.0.0.1:9012"
-	defaultNodeRPCListenAddr = "127.0.0.1:9012"
-	defaultNodeP2PListenAddr = "0.0.0.0:9011"
+	defaultRPCClientAPIHost  = "127.0.0.1:9014"
+	defaultNodeRPCListenAddr = "127.0.0.1:9014"
+	defaultNodeP2PListenAddr = "0.0.0.0:9015"
 	defaultNetworkId         = uint32(1)
 	defaultTestNetworkId     = uint32(2)
 	defaultProtocolVersion   = uint32(1)
@@ -51,7 +51,13 @@ const (
 	defaultCliTimeOut        = "180s"
 )
 
-var defaultMinGasPrice = common.DefaultGasPrice()
+var (
+	defaultMinGasPrice             = common.DefaultGasPrice()
+	defaultTxPoolSize       uint64 = 1000
+	defaultPriceBump        int64  = 10
+	defaultLifetime                = 3
+	defaultEvictionInterval        = 1
+)
 
 // var defaultMaxGasLimit = common.MinGasLimit
 
@@ -170,6 +176,7 @@ func defaultBootstrapNodes(netid uint32) []string {
 	}
 	return make([]string, 0)
 }
+
 func parseConfigNodeParams(v *viper.Viper, netid uint32) node.Config {
 	config := node.Config{
 		RPCConfig: new(xfsgo.RPCConfig),
@@ -192,24 +199,21 @@ func parseConfigNodeParams(v *viper.Viper, netid uint32) node.Config {
 }
 
 func parseConfigBackendParams(v *viper.Viper) backend.Params {
-	config := backend.Params{}
-	mCoinbase := v.GetString("miner.coinbase")
-	if mCoinbase != "" {
-		config.Coinbase = common.StrB58ToAddress(mCoinbase)
-	}
-	minGasPriceStr := v.GetString("miner.gasprice")
+	var (
+		config = backend.Params{}
+	)
+	config.MinerConfig = backendMinerLoadConf(v)
+	config.ProtocolConfig = backendProtocolLoadConf(v)
+	config.TxPoolConfig = backendTxPoolLoadConf(v)
+	return config
+}
+
+// position protocol loal tools viper protocol config
+func backendProtocolLoadConf(v *viper.Viper) *backend.ProtocolConfig {
+	config := new(backend.ProtocolConfig)
+
 	config.ProtocolVersion = v.GetUint32("protocol.version")
 	config.NetworkID = v.GetUint32("protocol.networkid")
-	config.Numworkers = v.GetUint32("miner.numworkers")
-	var minGasPrice *big.Int
-	var ok bool
-	if minGasPrice, ok = new(big.Int).SetString(minGasPriceStr, 10); !ok || minGasPrice.Cmp(defaultMinGasPrice) < 0 {
-		minGasPrice = defaultMinGasPrice
-	}
-	config.MinGasPrice = minGasPrice
-	if config.Numworkers == uint32(0) {
-		config.Numworkers = defaultNumWorkers
-	}
 
 	if config.ProtocolVersion == 0 {
 		config.ProtocolVersion = defaultProtocolVersion
@@ -217,7 +221,56 @@ func parseConfigBackendParams(v *viper.Viper) backend.Params {
 	if config.NetworkID == 0 {
 		config.NetworkID = defaultNetworkId
 	}
+
 	config.GenesisFile = v.GetString("protocol.genesisfile")
+	return config
+}
+
+func backendTxPoolLoadConf(v *viper.Viper) *backend.TxPoolConfig {
+	config := new(backend.TxPoolConfig)
+
+	config.TxPoolMaxSize = v.GetUint64("txpool.txpoolmaxsize")
+	if config.TxPoolMaxSize == uint64(0) {
+		config.TxPoolMaxSize = uint64(defaultTxPoolSize)
+	}
+
+	config.PriceBump = v.GetInt64("txpool.pricebump")
+	if config.PriceBump == int64(0) {
+		config.PriceBump = int64(defaultPriceBump)
+	}
+	config.Lifetime = v.GetInt("txpool.lifetime")
+	if config.Lifetime == int(0) {
+		config.Lifetime = defaultLifetime
+	}
+
+	config.EvictionInterval = v.GetInt("txpool.evictionInterval")
+	if config.EvictionInterval == int(0) {
+		config.EvictionInterval = defaultEvictionInterval
+	}
+	return config
+}
+
+// position miner loal tools viper miner config
+func backendMinerLoadConf(v *viper.Viper) *backend.MinerConfig {
+	config := new(backend.MinerConfig)
+
+	mCoinbase := v.GetString("miner.coinbase")
+	if mCoinbase != "" {
+		config.Coinbase = common.StrB58ToAddress(mCoinbase)
+	}
+
+	config.Numworkers = v.GetUint32("miner.numworkers")
+	if config.Numworkers == uint32(0) {
+		config.Numworkers = defaultNumWorkers
+	}
+
+	var minGasPrice *big.Int
+	var ok bool
+	minGasPriceStr := v.GetString("miner.gasprice")
+	if minGasPrice, ok = new(big.Int).SetString(minGasPriceStr, 10); !ok || minGasPrice.Cmp(defaultMinGasPrice) < 0 {
+		minGasPrice = defaultMinGasPrice
+	}
+	config.MinGasPrice = minGasPrice
 	return config
 }
 
@@ -229,7 +282,7 @@ func parseDaemonConfig(configFilePath string) (daemonConfig, error) {
 	mStorageParams := parseConfigStorageParams(config)
 	mBackendParams := parseConfigBackendParams(config)
 	mLoggerParams := parseConfigLoggerParams(config)
-	nodeParams := parseConfigNodeParams(config, mBackendParams.NetworkID)
+	nodeParams := parseConfigNodeParams(config, mBackendParams.ProtocolConfig.NetworkID)
 	nodeParams.NodeDBPath = mStorageParams.nodesDir
 	return daemonConfig{
 		loggerParams:  mLoggerParams,

@@ -53,8 +53,8 @@ type gasLimitFn func() *big.Int
 
 type TxPoolConfig struct {
 	TxPoolMaxSize    uint64
-	PriceBump        int64
-	Lifetime         time.Duration
+	PriceBump        int64         //// Minimum price bump percentage to replace an already existing transaction (nonce)
+	Lifetime         time.Duration // Maximum amount of time non-executable transaction are queued
 	EvictionInterval time.Duration // Time interval to check for evictable transactions
 }
 

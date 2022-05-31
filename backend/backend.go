@@ -21,6 +21,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"time"
 	"xfsgo"
 	"xfsgo/common"
 	"xfsgo/miner"
@@ -50,13 +51,29 @@ type Backend struct {
 }
 
 type Params struct {
+	Debug          bool
+	ProtocolConfig *ProtocolConfig
+	MinerConfig    *MinerConfig
+	TxPoolConfig   *TxPoolConfig
+}
+
+type MinerConfig struct {
+	MinGasPrice *big.Int
+	Numworkers  uint32
+	Coinbase    common.Address
+}
+
+type TxPoolConfig struct {
+	TxPoolMaxSize    uint64
+	PriceBump        int64
+	Lifetime         int
+	EvictionInterval int
+}
+
+type ProtocolConfig struct {
 	NetworkID       uint32
 	GenesisFile     string
-	Coinbase        common.Address
-	Numworkers      uint32
 	ProtocolVersion uint32
-	Debug           bool
-	MinGasPrice     *big.Int
 }
 
 // Config contains the configuration options of the Backend.
@@ -81,13 +98,19 @@ func (c *chainSyncProtocol) Run(p p2p.Peer) error {
 // This method is for daemon whick should be started firstly when xfs blockchain runs.
 //
 func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
-	var err error = nil
 	back := &Backend{
 		config:    config,
 		p2pServer: stack.P2PServer(),
 	}
+
+	var (
+		err             error = nil
+		minerLoadConfig       = config.MinerConfig
+		protocolConfig        = config.ProtocolConfig
+		txpoolConfig          = config.TxPoolConfig
+	)
 	back.eventBus = xfsgo.NewEventBus()
-	if config.NetworkID == uint32(1) {
+	if protocolConfig.NetworkID == uint32(1) {
 		if xfsgo.VersionMajor() != 1 {
 			return nil, ErrMainNetDisabled
 		}
@@ -95,14 +118,14 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 			back.config.StateDB, back.config.ChainDB, config.Params.Debug); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
-	} else if config.NetworkID == uint32(2) {
+	} else if protocolConfig.NetworkID == uint32(2) {
 		if _, err = xfsgo.WriteTestNetGenesisBlockN(
 			back.config.StateDB, back.config.ChainDB, config.Params.Debug); err != nil {
 			return nil, err
 		}
-	} else if len(config.GenesisFile) > 0 {
+	} else if len(protocolConfig.GenesisFile) > 0 {
 		var fr *os.File
-		if fr, err = os.Open(config.GenesisFile); err != nil {
+		if fr, err = os.Open(protocolConfig.GenesisFile); err != nil {
 			return nil, ErrWriteGenesisBlock
 		}
 		if _, err = xfsgo.WriteGenesisBlockN(
@@ -120,12 +143,20 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		return nil, err
 	}
 	back.wallet = xfsgo.NewWallet(back.config.KeysDB)
+
+	xfstxpoolconfig := &xfsgo.TxPoolConfig{
+		TxPoolMaxSize:    txpoolConfig.TxPoolMaxSize,
+		PriceBump:        txpoolConfig.PriceBump,
+		Lifetime:         time.Duration(txpoolConfig.Lifetime) * time.Hour,
+		EvictionInterval: time.Duration(txpoolConfig.EvictionInterval) * time.Minute,
+	}
+
 	back.txPool = xfsgo.NewTxPool(
-		nil, // nil TxPoolConfig
+		xfstxpoolconfig, // TxPoolConfig
 		back.blockchain.CurrentStateTree,
 		back.blockchain.LatestGasLimit,
-		back.config.MinGasPrice, back.eventBus)
-	coinbase := config.Coinbase
+		minerLoadConfig.MinGasPrice, back.eventBus)
+	coinbase := minerLoadConfig.Coinbase
 	addrdef := back.wallet.GetDefault()
 	if !coinbase.Equals(common.Address{}) || addrdef.Equals(common.Address{}) {
 		coinbase, err = back.wallet.AddByRandom()
@@ -139,15 +170,15 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 	//constructs Miner instance.
 	minerconfig := &miner.Config{
 		Coinbase:   back.wallet.GetDefault(),
-		Numworkers: config.Numworkers,
+		Numworkers: minerLoadConfig.Numworkers,
 	}
 	back.miner = miner.NewMiner(minerconfig,
 		back.config.LogsDB, back.config.StateDB, back.blockchain,
 		back.eventBus, back.txPool,
-		config.MinGasPrice, common.TxPoolGasLimit)
+		minerLoadConfig.MinGasPrice, common.TxPoolGasLimit)
 
 	logrus.Debugf("Initial miner: coinbase=%s, gasPrice=%s, gasLimit=%s",
-		minerconfig.Coinbase.B58String(), config.MinGasPrice, common.TxPoolGasLimit)
+		minerconfig.Coinbase.B58String(), minerLoadConfig.MinGasPrice, common.TxPoolGasLimit)
 	//Node resgisters apis of baclend on the node  for RPC service.
 	if err = stack.RegisterBackend(
 		back.eventBus,
@@ -160,7 +191,7 @@ func NewBackend(stack *node.Node, config *Config) (*Backend, error) {
 		return nil, err
 	}
 	back.syncMgr = newSyncMgr(
-		back.config.ProtocolVersion, back.config.NetworkID,
+		protocolConfig.ProtocolVersion, protocolConfig.NetworkID,
 		back.blockchain, back.eventBus, back.txPool)
 	back.p2pServer.Bind(&chainSyncProtocol{
 		syncMgr: back.syncMgr,

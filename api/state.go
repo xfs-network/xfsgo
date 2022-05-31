@@ -44,7 +44,7 @@ type GetStorageAtArgs struct {
 	Key      string `json:"key"`
 }
 
-func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp **string) error {
+func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) error {
 	var rootHash common.Hash
 	if args.RootHash == "" {
 		rootHash = state.BlockChain.CurrentBHeader().StateRoot
@@ -72,11 +72,11 @@ func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp **string) err
 	data := stateTree.GetStateObj(address)
 
 	if data == (&xfsgo.StateObj{}) || data == nil || data.GetBalance() == nil {
-		**resp = "0"
+		*resp = "0"
 		return nil
 	}
 	respstring := data.GetBalance().String()
-	*resp = &respstring
+	*resp = respstring
 	return nil
 
 }

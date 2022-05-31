@@ -69,10 +69,10 @@ func resetConfig(config *daemonConfig) {
 		config.nodeConfig.P2PListenAddress = p2paddr
 	}
 	if netid != 0 {
-		config.backendParams.NetworkID = uint32(netid)
+		config.backendParams.ProtocolConfig.NetworkID = uint32(netid)
 	}
 	if testnet {
-		config.backendParams.NetworkID = defaultTestNetworkId
+		config.backendParams.ProtocolConfig.NetworkID = defaultTestNetworkId
 		if config.nodeConfig.P2PBootstraps == nil || len(config.nodeConfig.P2PBootstraps) == 0 {
 			config.nodeConfig.P2PBootstraps = defaultBootstrapNodes(defaultTestNetworkId)
 		}

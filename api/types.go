@@ -137,19 +137,37 @@ type Wallet struct {
 	newTime int64
 }
 
-type Wallets []*Wallet
+type WalletsHeap []Wallet
 
-func (a Wallets) Len() int {
-	return len(a)
+func (h WalletsHeap) Len() int           { return len(h) }
+func (h WalletsHeap) Less(i, j int) bool { return h[i].newTime > h[j].newTime }
+func (h WalletsHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *WalletsHeap) Push(x interface{}) {
+	*h = append(*h, x.(Wallet))
 }
 
-func (a Wallets) Less(i, j int) bool {
-	return a[i].newTime > a[j].newTime
+func (h *WalletsHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }
 
-func (a Wallets) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
+// type Wallets []*Wallet
+
+// func (a Wallets) Len() int {
+// 	return len(a)
+// }
+
+// func (a Wallets) Less(i, j int) bool {
+// 	return a[i].newTime > a[j].newTime
+// }
+
+// func (a Wallets) Swap(i, j int) {
+// 	a[i], a[j] = a[j], a[i]
+// }
 
 func coverTxs2Resp(pending []*xfsgo.Transaction, dst **TransactionsResp) error {
 	if len(pending) == 0 {
@@ -169,7 +187,7 @@ func coverTxs2Resp(pending []*xfsgo.Transaction, dst **TransactionsResp) error {
 
 func coverBlock2Resp(block *xfsgo.Block, dst **BlockResp) error {
 	if block == nil {
-		*&dst = nil
+		*dst = nil
 		return nil
 	}
 	result := new(BlockResp)

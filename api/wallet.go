@@ -18,9 +18,9 @@ package api
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/hex"
 	"math/big"
-	"sort"
 	"xfsgo"
 	"xfsgo/common"
 )
@@ -91,28 +91,29 @@ func (handler *WalletHandler) Del(args WalletByAddressArgs, resp *interface{}) e
 	return nil
 }
 
-func (handler *WalletHandler) List(_ EmptyArgs, resp **[]common.Address) error {
+func (handler *WalletHandler) List(_ EmptyArgs, resp *[]string) error {
 	data := handler.Wallet.All()
-	var out Wallets
-	for addr, v := range data {
-		_ = v
+	out := new(WalletsHeap)
+
+	heap.Init(out)
+	for addr := range data {
 		r, err := handler.Wallet.GetWalletNewTime(addr)
 		if err != nil {
 			return err
 		}
-		req := &Wallet{
+		req := Wallet{
 			addr:    addr,
 			newTime: int64(common.Byte2Int(r)),
 		}
-		out = append(out, req)
+		heap.Push(out, req)
 	}
 
-	sort.Sort(out)
-	result := make([]common.Address, 0)
-	for i := 0; i < len(out); i++ {
-		result = append(result, out[i].addr)
+	result := make([]string, 0)
+	for out.Len() > 0 {
+		wallet := heap.Pop(out).(Wallet)
+		result = append(result, wallet.addr.B58String())
 	}
-	*resp = &result
+	*resp = result
 	return nil
 }
 

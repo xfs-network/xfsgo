@@ -145,14 +145,14 @@ func GetPending(cmd *cobra.Command, args []string) error {
 		fmt.Println(err)
 		return err
 	}
-	var txPending *TransactionsResp
+	var txPending interface{}
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	err = cli.CallMethod(1, "TxPool.GetPending", nil, &txPending)
 	if err != nil {
 		return err
 	}
 	if txPending == nil {
-		fmt.Println(txPending)
+		fmt.Println("Not found data")
 		return nil
 	}
 	bs, err := common.MarshalIndent(txPending)
@@ -169,7 +169,7 @@ func GetQueue(cmd *cobra.Command, args []string) error {
 		fmt.Println(err)
 		return err
 	}
-	var txQueue *TransactionsResp
+	var txQueue interface{}
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
 	err = cli.CallMethod(1, "TxPool.GetQueue", nil, &txQueue)
 	if err != nil {
