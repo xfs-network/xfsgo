@@ -41,9 +41,9 @@ const (
 	defaultExtraDir          = "extra"
 	defaultNodesDir          = "nodes"
 	defaultLogsDir           = "logs"
-	defaultRPCClientAPIHost  = "127.0.0.1:9014"
-	defaultNodeRPCListenAddr = "127.0.0.1:9014"
-	defaultNodeP2PListenAddr = "0.0.0.0:9015"
+	defaultRPCClientAPIHost  = "127.0.0.1:9012"
+	defaultNodeRPCListenAddr = "127.0.0.1:9012"
+	defaultNodeP2PListenAddr = "0.0.0.0:9011"
 	defaultNetworkId         = uint32(1)
 	defaultTestNetworkId     = uint32(2)
 	defaultProtocolVersion   = uint32(1)
