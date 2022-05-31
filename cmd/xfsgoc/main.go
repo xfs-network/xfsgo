@@ -32,14 +32,20 @@ type StdToken struct {
 }
 
 type ArgObj struct {
+    Name string `json:"name"`
 	Type string `json:"type"`
 }
 
-type ABIObj struct {
+type MethodABIObj struct {
 	Name       string    `json:"name"`
 	Argc       int       `json:"argc"`
 	Args       []*ArgObj `json:"args"`
-	ReturnType string    `json:"returnType"`
+	ReturnType string    `json:"return_type"`
+}
+type EventABIObj struct {
+	Name       string    `json:"name"`
+	Argc       int       `json:"argc"`
+	Args       []*ArgObj `json:"args"`
 }
 
 func jsonDump(v interface{}) string {
@@ -96,10 +102,10 @@ func NewBuiltinCompiler() *BuiltinCompiler {
 	return c
 }
 
-func parseMethodArgs(m reflect.Method) (int, []*ArgObj) {
-	mt := m.Type
-	argc := mt.NumIn()
-	argc = argc - 1
+func parseMethodArgs(m reflect.Method) (int, []*ArgObj) { 
+    mt := m.Type 
+    argc := mt.NumIn() 
+    argc = argc - 1
 	argobjs := make([]*ArgObj, 0)
 	margc := 0
 	for i := 1; i < argc+1; i++ {
@@ -118,9 +124,9 @@ func parseMethodArgs(m reflect.Method) (int, []*ArgObj) {
 	return margc, argobjs
 }
 
-func (c *BuiltinCompiler) exportABI(id uint8) (map[string]*ABIObj, error) {
+func (c *BuiltinCompiler) exportMethodABI(id uint8) (map[string]*MethodABIObj, error) {
 	if ct, exists := c.builtins[id]; exists {
-		abiobjs := make(map[string]*ABIObj)
+		abiobjs := make(map[string]*MethodABIObj)
 		for i := 0; i < ct.NumMethod(); i++ {
 			methodItem := ct.Method(i)
 			methodName := methodItem.Name
@@ -132,7 +138,7 @@ func (c *BuiltinCompiler) exportABI(id uint8) (map[string]*ABIObj, error) {
 				out0 := methodItem.Type.Out(0)
 				out0name := out0.Name()
 				// mv := cv.MethodByName(aname)
-				item := &ABIObj{
+				item := &MethodABIObj{
 					Name:       methodName,
 					Argc:       argc,
 					Args:       argobjs,
@@ -159,8 +165,50 @@ func outbin(writer *bytes.Buffer, w io.Writer) {
 	os.Exit(0)
 }
 
-func outabi(abi map[string]*ABIObj, w io.Writer) {
-	abijson, err := json.Marshal(abi)
+func parseEventArgs(et reflect.Type) (int, []*ArgObj) { 
+    ee := et.Elem()
+    fields := ee.NumField()
+	argobjs := make([]*ArgObj, fields)
+	for i := 0; i < fields; i++ {
+        fn := ee.Field(i) 
+        fnt := fn.Type
+        argobjs[i] = &ArgObj{
+            Type: fnt.Name(),
+            Name: fn.Name,
+        }
+	}
+	return fields, argobjs
+}
+func (c *BuiltinCompiler) exportEventABI(code uint8) map[string]*EventABIObj {
+    events := make([]interface{}, 0)
+    if code == 0x01 {
+        events = append(events, &vm.StdTokenTransferEvent{})
+        events = append(events, &vm.StdTokenApprovalEvent{})
+    }else if code == 0x02 {
+        events = append(events, &vm.NFTokenTransferEvent{})
+        events = append(events, &vm.NFTokenApprovalEvent{})
+        events = append(events, &vm.NFTokenApprovalForAllEvent{})
+    }
+    objs := make(map[string]*EventABIObj)
+    for _, event := range events {
+        etype := reflect.TypeOf(event)
+        etypename := etype.Elem().Name()
+        namehash := ahash.SHA256([]byte(etypename))
+        namehashstr := common.BytesToHexString(namehash)
+        n, args := parseEventArgs(etype)
+        objs[namehashstr] = &EventABIObj{
+            Name: etypename,
+            Argc: n,
+            Args: args,
+        }
+    }
+    return objs
+}
+func outabi(methodABI map[string]*MethodABIObj, eventABI map[string]*EventABIObj, w io.Writer) {
+    outabi := make(map[string]interface{})
+    outabi["methods"] = methodABI
+    outabi["events"] = eventABI
+	abijson, err := json.Marshal(outabi)
 	errout(err, "Failed export abi data")
 	_, err = fmt.Fprintln(w, string(abijson))
 	errout(err, "Failed write: ")
@@ -199,16 +247,18 @@ func main() {
 		binwriter.Write([]byte{0x01})
 		outbin(binwriter, out)
 	} else if isStdToken && isAbi {
-		abi, err := compiler.exportABI(0x01)
+		methodABI, err := compiler.exportMethodABI(0x01)
 		errout(err, "Failed export abi data")
-		outabi(abi, out)
+        eventABI := compiler.exportEventABI(0x01)
+		outabi(methodABI, eventABI, out)
 	} else if isNFToken && isBin {
 		binwriter.Write([]byte{0x02})
 		outbin(binwriter, out)
 	} else if isNFToken && isAbi {
-		abi, err := compiler.exportABI(0x02)
+		methodABI, err := compiler.exportMethodABI(0x02)
 		errout(err, "Failed export abi data")
-		outabi(abi, out)
+        eventABI := compiler.exportEventABI(0x02)
+		outabi(methodABI, eventABI, out)
 	}
 	flag.Usage()
 }
