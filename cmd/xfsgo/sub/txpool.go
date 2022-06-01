@@ -86,35 +86,7 @@ var (
 		Short:                 "deletes the specified transaction hash in the local transaction pool",
 		RunE:                  RemoveTx,
 	}
-	addrTxNonceCommand = &cobra.Command{
-		Use:                   "getaddrtxnonce [options] <address>",
-		DisableFlagsInUseLine: true,
-		Short:                 "get the nonce value in the transaction pool of the parameter address",
-		RunE:                  AddrTxNonce,
-	}
 )
-
-func AddrTxNonce(cmd *cobra.Command, args []string) error {
-	if len(args) < 1 {
-		return cmd.Help()
-	}
-	config, err := parseClientConfig(cfgFile)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	var result int
-	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
-	req := &getAddrNonceByHashArgs{
-		Address: args[0],
-	}
-	err = cli.CallMethod(1, "TxPool.GetAddrTxNonce", &req, &result)
-	if err != nil {
-		return err
-	}
-	fmt.Println(result)
-	return nil
-}
 
 func RemoveTx(cmd *cobra.Command, args []string) error {
 	if len(args) < 1 {
@@ -308,6 +280,5 @@ func init() {
 	getTxpoolCommand.AddCommand(getGetTranCommand)
 	getTxpoolCommand.AddCommand(RemoveQueuesCommand)
 	getTxpoolCommand.AddCommand(clearTxPoolCommand)
-	getTxpoolCommand.AddCommand(addrTxNonceCommand)
 	getTxpoolCommand.AddCommand(removeTxCommand)
 }

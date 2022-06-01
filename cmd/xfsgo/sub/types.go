@@ -16,11 +16,6 @@
 
 package sub
 
-import (
-	"math/big"
-	"xfsgo/common"
-)
-
 type getBlockByHashArgs struct {
 	Hash string `json:"hash"`
 }
@@ -124,27 +119,23 @@ type removeTxArgs struct {
 	Hash string `json:"hash"`
 }
 
-type getAddrNonceByHashArgs struct {
-	Address string `json:"address"`
-}
-
 type minerStartArgs struct {
 	Num string `json:"num"`
 }
 
-type TransactionResp struct {
-	Version   uint32         `json:"version"`
-	To        common.Address `json:"to"`
-	GasPrice  *big.Int       `json:"gas_price"`
-	GasLimit  *big.Int       `json:"gas_limit"`
-	Nonce     uint64         `json:"nonce"`
-	Value     *big.Int       `json:"value"`
-	Timestamp uint64         `json:"timestamp"`
-	From      string         `json:"from"`
-	Hash      common.Hash    `json:"hash"`
-	Data      []byte         `json:"data"`
-}
+// type TransactionResp struct {
+// 	Version   uint32         `json:"version"`
+// 	To        common.Address `json:"to"`
+// 	GasPrice  *big.Int       `json:"gas_price"`
+// 	GasLimit  *big.Int       `json:"gas_limit"`
+// 	Nonce     uint64         `json:"nonce"`
+// 	Value     *big.Int       `json:"value"`
+// 	Timestamp uint64         `json:"timestamp"`
+// 	From      string         `json:"from"`
+// 	Hash      common.Hash    `json:"hash"`
+// 	Data      []byte         `json:"data"`
+// }
 
-type TransactionsResp []*TransactionResp
+// type TransactionsResp []*TransactionResp
 
 // type DataSet []*map[string]interface{}
