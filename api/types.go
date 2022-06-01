@@ -243,8 +243,13 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 	}
 	datahex := hex.EncodeToString(tx.Data)
 	signhex := hex.EncodeToString(tx.Signature)
-	result.Data = "0x" + datahex
-	result.Signature = "0x" + signhex
+
+	if datahex != "" {
+		result.Data = "0x" + datahex
+	}
+	if signhex != "" {
+		result.Signature = "0x" + signhex
+	}
 	result.From = from.B58String()
 	return nil
 }
