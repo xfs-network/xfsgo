@@ -60,7 +60,7 @@ type TxPoolConfig struct {
 
 func defaultTxPoolConfig() *TxPoolConfig {
 	return &TxPoolConfig{
-		TxPoolMaxSize:    100,
+		TxPoolMaxSize:    1000,
 		PriceBump:        10,
 		Lifetime:         3 * time.Hour,
 		EvictionInterval: time.Minute,

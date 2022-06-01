@@ -39,7 +39,7 @@ type jsonRPCReq struct {
 type jsonRPCResp struct {
 	JSONRPC string      `json:"jsonrpc"`
 	Result  interface{} `json:"result"`
-	Error   RPCError    `json:"error"`
+	Error   rpcError    `json:"error"`
 	ID      int         `json:"id"`
 }
 
@@ -78,9 +78,10 @@ func (cli *Client) CallMethod(id int, methodname string, params interface{}, out
 	if resp == nil {
 		return fmt.Errorf("resp null")
 	}
-	e := resp.Error
-	if e != nil {
-		return e
+
+	e := resp.Error.Message
+	if e != "" {
+		return fmt.Errorf(e)
 	}
 
 	js, err := json.Marshal(resp.Result)
