@@ -124,6 +124,10 @@ type removeTxArgs struct {
 	Hash string `json:"hash"`
 }
 
+type getAddrNonceByHashArgs struct {
+	Address string `json:"address"`
+}
+
 type minerStartArgs struct {
 	Num string `json:"num"`
 }
