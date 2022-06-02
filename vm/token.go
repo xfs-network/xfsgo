@@ -142,7 +142,7 @@ func (t *token) TransferFrom(ctx *ContractContext, from, to CTypeAddress, amount
 		if residual.Sign() < 0 {
 			return CBoolFalse
 		}
-		t.Balances[from] = NewUint256(residual)
+		t.Balances[to] = NewUint256(residual)
 		var targetBalance *big.Int
 		if tv, ex := t.Balances[from]; ex {
 			targetBalance = new(big.Int).SetBytes(tv[:])
