@@ -418,28 +418,28 @@ func (server *RPCServer) Start() error {
 			sendHTTPRPCResponse(c, 200, data)
 			return
 		}
-        var batchs []*RPCMessageRequest
-        if err = json.Unmarshal(body, &batchs); err == nil {
-            var resps []interface{}
-            resps = make([]interface{}, len(batchs))
-            for i := 0; i < len(batchs); i++ {
-                requestSigle := batchs[i]
-                var reply interface{}
-                var resp interface{}
-                if err = server.gotRPCRequestReply(requestSigle, &reply, nil); err != nil {
-                    resp = packErrorMessage(requestSigle.Id, err)
-                }else {
-                    resp = &RPCMessageRespSuccess{
-                        Jsonrpc: jsonrpcVersion,
-                        Id:      request.Id,
-                        Result:  reply,
-                    }
-                }
-                resps[i] = resp;
-            }
-            sendHTTPRPCResponse(c, 200, resps)
-            return
-        }
+		var batchs []*RPCMessageRequest
+		if err = json.Unmarshal(body, &batchs); err == nil {
+			var resps []interface{}
+			resps = make([]interface{}, len(batchs))
+			for i := 0; i < len(batchs); i++ {
+				requestSigle := batchs[i]
+				var reply interface{}
+				var resp interface{}
+				if err = server.gotRPCRequestReply(requestSigle, &reply, nil); err != nil {
+					resp = packErrorMessage(requestSigle.Id, err)
+				} else {
+					resp = &RPCMessageRespSuccess{
+						Jsonrpc: jsonrpcVersion,
+						Id:      request.Id,
+						Result:  reply,
+					}
+				}
+				resps[i] = resp
+			}
+			sendHTTPRPCResponse(c, 200, resps)
+			return
+		}
 		sendHTTPRPCError(c, 400, nil, parseError)
 	})
 
@@ -483,10 +483,14 @@ func (server *RPCServer) readRequest(request *RPCMessageRequest) (
 	}
 	err = json.Unmarshal(request.Params, argv.Interface())
 	if err != nil {
-		var params []interface{}
+		var params []*interface{}
 		err = json.Unmarshal(request.Params, &params)
+		if err != nil {
+			return
+		}
 		n := m.ArgType.NumField()
 		if len(params) != n {
+			err = ParamsParseError("params require count: %d", n)
 			return
 		}
 		for i := 0; i < n; i++ {
@@ -496,7 +500,11 @@ func (server *RPCServer) readRequest(request *RPCMessageRequest) (
 			} else {
 				field = argv.Field(i)
 			}
-			field.Set(reflect.ValueOf(params[i]))
+			if params[i] == nil {
+				field.Set(reflect.Zero(field.Type()))
+				continue
+			}
+			field.Set(reflect.ValueOf(*params[i]))
 		}
 		err = nil
 	}

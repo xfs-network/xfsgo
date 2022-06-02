@@ -34,6 +34,15 @@ var (
 	methodNotFoundError = NewRPCError(-32601, "Method not found")
 	invalidParamsError  = NewRPCError(-32602, "Invalid params")
 	internalError       = NewRPCError(-32603, "Internal error")
+	RequireParamError   = func(msg string, params ...interface{}) *rpcError {
+		return NewRPCError(-32000, fmt.Sprintf(msg, params...))
+	}
+	ParamsParseError = func(msg string, params ...interface{}) *rpcError {
+		return NewRPCError(-32001, fmt.Sprintf(msg, params...))
+	}
+	LoadStateTreeError = func(msg string, params ...interface{}) *rpcError {
+		return NewRPCError(-32002, fmt.Sprintf(msg, params...))
+	}
 )
 
 func NewRPCError(code int, message string) *rpcError {

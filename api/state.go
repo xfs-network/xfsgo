@@ -19,7 +19,6 @@ package api
 import (
 	"fmt"
 	"xfsgo"
-	"xfsgo/avlmerkle"
 	"xfsgo/common"
 	"xfsgo/storage/badger"
 )
@@ -40,8 +39,9 @@ type GetBalanceArgs struct {
 }
 
 type GetStorageAtArgs struct {
-	RootHash string `json:"root_hash"`
-	Key      string `json:"key"`
+	StateRoot string `json:"root_hash"`
+	Address   string `json:"address"`
+	Key       string `json:"key"`
 }
 
 func (state *StateAPIHandler) GetBalance(args GetBalanceArgs, resp *string) error {
@@ -109,28 +109,35 @@ func (state *StateAPIHandler) GetAccount(args GetAccountArgs, resp **StateObjRes
 }
 
 func (state *StateAPIHandler) GetStorageAt(args GetStorageAtArgs, resp **string) error {
-	if args.RootHash == "" {
-		return xfsgo.NewRPCError(-32601, "Require storage root hash")
+	currentHeader := state.BlockChain.CurrentBHeader()
+	stateRoot := currentHeader.StateRoot
+	var err error
+	if args.StateRoot != "" {
+		stateRoot = common.Hex2Hash(args.StateRoot)
 	}
-	rootHashBytes, err := common.HexToBytes(args.RootHash)
+	stateTree, err := xfsgo.NewStateTreeN(state.StateDb, stateRoot[:])
 	if err != nil {
-		return xfsgo.NewRPCErrorCause(-32001, err)
+		return xfsgo.LoadStateTreeError("Load status tree error: %s, from: %x", err, stateTree)
 	}
-	stateTree, err := avlmerkle.NewTreeN(state.StateDb, rootHashBytes)
-	if err != nil {
-		return xfsgo.NewRPCError(-32001,
-			fmt.Sprintf("Notfound root hash: 0x%x", rootHashBytes))
+	var address common.Address
+	if args.Address == "" {
+		return xfsgo.RequireParamError("Require param 'address'")
+	}
+	address = common.StrB58ToAddress(args.Address)
+	if args.Key == "" {
+		return xfsgo.RequireParamError("Require param 'key'")
 	}
 	keyBytes, err := common.HexToBytes(args.Key)
 	if err != nil {
-		return xfsgo.NewRPCErrorCause(-32001, err)
+		return xfsgo.ParamsParseError("Parse key err: %s", err)
 	}
-	val, exists := stateTree.Get(keyBytes)
-	if !exists {
-		return xfsgo.NewRPCError(-32601,
-			fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
+	hash := common.Bytes2Hash(keyBytes)
+	value := stateTree.GetStateValue(address, hash)
+	if value == nil {
+		*resp = nil
+		return nil
 	}
-	outhex := common.BytesToHexString(val)
+	outhex := common.BytesToHexString(value)
 	if outhex == "" {
 		return xfsgo.NewRPCError(-32601,
 			fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
