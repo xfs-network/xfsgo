@@ -14,7 +14,7 @@ func fullhex(a *big.Int) string {
 }
 
 func TestAccumulateRewards(t *testing.T) {
-	target1 := new(big.Int).Lsh(big0xff, (32-4)*8+16)
+	target1 := new(big.Int).Lsh(big0xff, (32-4)*8+18)
 	target2 := new(big.Int).Lsh(big0xff, (32-4)*8)
 	_ = target2
 	tb := target1.Bytes()
@@ -26,8 +26,8 @@ func TestAccumulateRewards(t *testing.T) {
 	bits := BigByZip(target1)
 	bits2 := BigByZip(target2)
 	t.Logf("bits: %d", bits)
-	t.Logf("bits2: %d", bits2)
 	t.Logf(" target: %x", targetBs)
+	t.Logf("bits2: %d", bits2)
 	t.Logf("target2: %x", targetBs2)
 }
 

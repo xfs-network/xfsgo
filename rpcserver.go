@@ -490,7 +490,7 @@ func (server *RPCServer) readRequest(request *RPCMessageRequest) (
 		}
 		n := m.ArgType.NumField()
 		if len(params) != n {
-			err = ParamsParseError("params require count: %d", n)
+			err = ParamsParseError("Params require count: %d", n)
 			return
 		}
 		for i := 0; i < n; i++ {
@@ -503,6 +503,12 @@ func (server *RPCServer) readRequest(request *RPCMessageRequest) (
 			if params[i] == nil {
 				field.Set(reflect.Zero(field.Type()))
 				continue
+			}
+			paramValue := reflect.ValueOf(*params[i])
+			if paramValue.Type() != field.Type() {
+				err = ParamsParseError("Type check err: params[%d] got type %s, but want type: %s", i,
+					paramValue.Type().Name(), field.Type().Name())
+				return
 			}
 			field.Set(reflect.ValueOf(*params[i]))
 		}

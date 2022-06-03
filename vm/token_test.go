@@ -81,6 +81,7 @@ func TestToken_Transfer(t *testing.T) {
 	assertCTypeBool(t, result, CBoolFalse)
 	zeroContext := &ContractContext{
 		caller: common.Address{},
+		logger: NewLogger(),
 	}
 	// 第三次转移测试，使用零地址作为发送地址向目标地址转移
 	// 期望结果：失败

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"xfsgo/common"
 	"xfsgo/common/ahash"
@@ -129,7 +128,6 @@ func (vm *xvm) Create(addr common.Address, input []byte) error {
 	fromAddressHashBytes := ahash.SHA256(addr[:])
 	fromAddressHash := common.Bytes2Hash(fromAddressHashBytes)
 	caddr := crypto.CreateAddress(fromAddressHash, nonce)
-	logrus.Infof("Create address: %s", caddr.B58String())
 	if err := vm.Run(addr, caddr, nil, input); err != nil {
 		return err
 	}

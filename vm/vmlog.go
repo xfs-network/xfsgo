@@ -32,7 +32,7 @@ func (l *logger) Event(e interface{}) {
 		return
 	}
 	etype := reflect.TypeOf(e)
-	etypename := etype.Name()
+	etypename := etype.Elem().Name()
 	namehash := ahash.SHA256Array([]byte(etypename))
 	l.events = append(l.events, Event{
 		Hash:  namehash,

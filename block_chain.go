@@ -1000,7 +1000,7 @@ func (bc *BlockChain) ApplyTransaction(
 	if TxToAddrNotSet(tx) {
 		logaddr = makeAddress(sender.address, tx.Nonce)
 	} else {
-		logaddr = sender.address
+		logaddr = tx.To
 	}
 	bc.logStorage.PutAllEvents(tx.Hash(), logaddr, events)
 

@@ -41,7 +41,7 @@ miner:
   coinbase: ""
   # number of thread executed
   # that will be limited by your mining machine configuration
-  numworkers: 10
+  numworkers: 64
 
 storage:
   # path of data storage
