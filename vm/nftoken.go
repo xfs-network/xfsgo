@@ -26,7 +26,7 @@ type nftoken struct {
 type NFTokenTransferEvent struct {
 	From    CTypeAddress `json:"from"`
 	To      CTypeAddress `json:"to"`
-	TokenId CTypeUint256 `json:"TokenId"`
+	TokenId CTypeUint256 `json:"tokenId"`
 }
 
 type NFTokenApprovalEvent struct {

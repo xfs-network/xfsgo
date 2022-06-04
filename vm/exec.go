@@ -119,6 +119,14 @@ func (ce *builtinContractExec) call(fn reflect.Method, fnv reflect.Value, input 
 				return err
 			}
 			args = append(args, reflect.ValueOf(addr))
+		case reflect.TypeOf(CTypeBool{}):
+			m, err := buf.ReadUint8()
+			if err != nil {
+				return err
+			}
+			if m.Uint8() == 1 {
+				args = append(args, reflect.ValueOf(CBoolTrue))
+			}
 		}
 	}
 	r := fnv.Call(args)
