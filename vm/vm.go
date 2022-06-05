@@ -136,6 +136,9 @@ func (vm *xvm) Create(addr common.Address, input []byte) error {
 
 func (vm *xvm) Call(from, address common.Address, input []byte) error {
 	code := vm.stateTree.GetCode(address)
+	if code == nil {
+		return nil
+	}
 	if err := vm.Run(from, address, code, input); err != nil {
 		return err
 	}

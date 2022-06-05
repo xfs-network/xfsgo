@@ -39,7 +39,7 @@ const (
 	// adjustment factor
 	adjustmentFactor   = int64(2)
 	maxOrphanBlocks    = 100
-	targetTimePerBlock = int64(time.Minute * 3 / time.Second)
+	targetTimePerBlock = int64(time.Minute * 2 / time.Second)
 	//targetTimespanPreV4 = int64(time.Hour * 1 / time.Second)
 	//targetTimespanV4    = int64(time.Minute * 57 / time.Second)
 	//endTimeV2           = int64(time.Hour * 1008 / time.Second)
@@ -50,7 +50,7 @@ const (
 	//totalblocksv4       = endTimeV4 / targetTimePerBlock
 	//totalblocks         = endTimeV2/targetTimePerBlock + endTimeV3/targetTimePerBlock + endTimeV4/targetTimePerBlock
 	//targetTimePerBlock = int64(time.Minute * 1 / time.Second)
-	targetTimespan = int64(time.Hour * 1 / time.Second)
+	targetTimespan = int64(time.Hour * 24 / time.Second)
 	//endTimeV1 = int64(time.Minute * 10 / time.Second)
 )
 
