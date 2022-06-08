@@ -123,14 +123,21 @@ func (state *StateAPIHandler) GetStorageAt(args GetStorageAtArgs, resp **string)
 	if args.Address == "" {
 		return xfsgo.RequireParamError("Require param 'address'")
 	}
-	address = common.StrB58ToAddress(args.Address)
+	// address = common.StrB58ToAddress(args.Address)
+	address = common.B58ToAddress([]byte(args.Address))
 	if args.Key == "" {
 		return xfsgo.RequireParamError("Require param 'key'")
 	}
+
+	if err := common.HashCalibrator(args.Key); err != nil {
+		return xfsgo.ParamsParseError("Hash Calibrator err: %s", err)
+	}
+
 	keyBytes, err := common.HexToBytes(args.Key)
 	if err != nil {
 		return xfsgo.ParamsParseError("Parse key err: %s", err)
 	}
+
 	hash := common.Bytes2Hash(keyBytes)
 	value := stateTree.GetStateValue(address, hash)
 	if value == nil {
@@ -139,8 +146,7 @@ func (state *StateAPIHandler) GetStorageAt(args GetStorageAtArgs, resp **string)
 	}
 	outhex := common.BytesToHexString(value)
 	if outhex == "" {
-		return xfsgo.NewRPCError(-32601,
-			fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
+		return xfsgo.NewRPCError(-32601, fmt.Sprintf("Notfound value by key: 0x%x", keyBytes[:]))
 	}
 	*resp = &outhex
 	return nil

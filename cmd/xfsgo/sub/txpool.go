@@ -68,11 +68,11 @@ var (
 		Short:                 "transaction pool queue transaction number",
 		RunE:                  getTxPoolQueueSize,
 	}
-	clearTxPoolCommand = &cobra.Command{
-		Use:                   "clear [options]",
+	cleanTxPoolCommand = &cobra.Command{
+		Use:                   "clean [options]",
 		DisableFlagsInUseLine: true,
 		Short:                 "delete all transactions from the local transaction pool",
-		RunE:                  ClearTxPool,
+		RunE:                  CleanTxPool,
 	}
 	RemoveQueuesCommand = &cobra.Command{
 		Use:                   "removequeues [options]",
@@ -109,7 +109,7 @@ func RemoveTx(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func ClearTxPool(cmd *cobra.Command, args []string) error {
+func CleanTxPool(cmd *cobra.Command, args []string) error {
 	config, err := parseClientConfig(cfgFile)
 	if err != nil {
 		fmt.Println(err)
@@ -117,7 +117,7 @@ func ClearTxPool(cmd *cobra.Command, args []string) error {
 	}
 	var result string
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
-	err = cli.CallMethod(1, "TxPool.Clear", nil, &result)
+	err = cli.CallMethod(1, "TxPool.Clean", nil, &result)
 	if err != nil {
 		return err
 	}
@@ -249,12 +249,12 @@ func GetTransaction(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf(args[0])
 	res := make(map[string]interface{}, 1)
-	hash := &getTranByHashArgs{
+	hash := &getTxByHashArgs{
 		Hash: args[0],
 	}
 
 	cli := xfsgo.NewClient(config.rpcClientApiHost, config.rpcClientApiTimeOut)
-	err = cli.CallMethod(1, "TxPool.GetTranByHash", &hash, &res)
+	err = cli.CallMethod(1, "TxPool.GetTxByHash", &hash, &res)
 	if err != nil {
 		return err
 	}
@@ -279,6 +279,6 @@ func init() {
 	getTxpoolCommand.AddCommand(getGetQueueCommand)
 	getTxpoolCommand.AddCommand(getGetTranCommand)
 	getTxpoolCommand.AddCommand(RemoveQueuesCommand)
-	getTxpoolCommand.AddCommand(clearTxPoolCommand)
+	getTxpoolCommand.AddCommand(cleanTxPoolCommand)
 	getTxpoolCommand.AddCommand(removeTxCommand)
 }
