@@ -249,7 +249,7 @@ func (handler *ChainAPIHandler) GetReceiptByHash(args GetReceiptByHashArgs, resp
 		Version:     dataReceipt.Version,
 		Status:      dataReceipt.Status,
 		TxHash:      dataReceipt.TxHash,
-		GasUsed:     dataReceipt.GasUsed,
+		GasUsed:     dataReceipt.GasUsed.String(),
 		BlockHeight: block.Height(),
 		BlockHash:   dataReceiptIndex.BlockHash,
 		BlockIndex:  dataReceiptIndex.BlockIndex,

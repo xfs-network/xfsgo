@@ -38,9 +38,9 @@ type MinerSetGasPriceArgs struct {
 	Value string `json:"value"`
 }
 
-type MinerSetCoinbaseArgs struct {
-	Coinbase string `json:"coinbase"`
-}
+// type MinerSetCoinbaseArgs struct {
+// 	Coinbase string `json:"coinbase"`
+// }
 
 type MinerSetWorkerArgs struct {
 	Num string `json:"num"`

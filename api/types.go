@@ -48,12 +48,12 @@ type BlockHeaderResp struct {
 	StateRoot        common.Hash `json:"state_root"`
 	TransactionsRoot common.Hash `json:"transactions_root"`
 	ReceiptsRoot     common.Hash `json:"receipts_root"`
-	GasLimit         *big.Int    `json:"gas_limit"`
-	GasUsed          *big.Int    `json:"gas_used"`
+	GasLimit         string      `json:"gas_limit"`
+	GasUsed          string      `json:"gas_used"`
 	// pow
 	Bits       uint32      `json:"bits"`
 	Nonce      uint32      `json:"nonce"`
-	ExtraNonce uint64      `json:"extranonce"`
+	ExtraNonce string      `json:"extranonce"`
 	Hash       common.Hash `json:"hash"`
 }
 
@@ -67,27 +67,27 @@ type BlockResp struct {
 	StateRoot        common.Hash `json:"state_root"`
 	TransactionsRoot common.Hash `json:"transactions_root"`
 	ReceiptsRoot     common.Hash `json:"receipts_root"`
-	GasLimit         *big.Int    `json:"gas_limit"`
-	GasUsed          *big.Int    `json:"gas_used"`
+	GasLimit         string      `json:"gas_limit"`
+	GasUsed          string      `json:"gas_used"`
 	// pow
 	Bits         uint32           `json:"bits"`
 	Nonce        uint32           `json:"nonce"`
-	ExtraNonce   uint64           `json:"extranonce"`
+	ExtraNonce   string           `json:"extranonce"`
 	Hash         common.Hash      `json:"hash"`
 	Transactions TransactionsResp `json:"transactions"`
 }
 
 type TransactionResp struct {
-	Version   uint32         `json:"version"`
-	To        common.Address `json:"to"`
-	GasPrice  *big.Int       `json:"gas_price"`
-	GasLimit  *big.Int       `json:"gas_limit"`
-	Nonce     uint64         `json:"nonce"`
-	Value     *big.Int       `json:"value"`
-	From      string         `json:"from"`
-	Hash      common.Hash    `json:"hash"`
-	Data      string         `json:"data"`
-	Signature string         `json:"signature"`
+	Version   uint32 `json:"version"`
+	To        string `json:"to"`
+	GasPrice  string `json:"gas_price"`
+	GasLimit  string `json:"gas_limit"`
+	Nonce     uint64 `json:"nonce"`
+	Value     string `json:"value"`
+	From      string `json:"from"`
+	Hash      string `json:"hash"`
+	Data      string `json:"data"`
+	Signature string `json:"signature"`
 }
 
 type MinerStartArgs struct {
@@ -111,7 +111,7 @@ type ReceiptResp struct {
 	Version     uint32        `json:"version"`
 	Status      uint32        `json:"status"`
 	TxHash      common.Hash   `json:"tx_hash"`
-	GasUsed     *big.Int      `json:"gas_used"`
+	GasUsed     string        `json:"gas_used"`
 	BlockHeight uint64        `json:"block_height"`
 	BlockHash   common.Hash   `json:"block_hash"`
 	BlockIndex  uint64        `json:"block_index"`
@@ -191,13 +191,26 @@ func coverBlock2Resp(block *xfsgo.Block, dst **BlockResp) error {
 		return nil
 	}
 	result := new(BlockResp)
-	if err := common.Objcopy(block.Header, result); err != nil {
-		return err
-	}
-	if err := common.Objcopy(block, result); err != nil {
-		return err
-	}
+
+	header := block.Header
+	result.Height = header.Height
+	result.Version = header.Version
+	result.HashPrevBlock = header.HashPrevBlock
+	result.Timestamp = header.Timestamp
+	result.Coinbase = header.Coinbase
+	// merkle tree root hash
+	result.StateRoot = header.StateRoot
+	result.TransactionsRoot = header.TransactionsRoot
+	result.ReceiptsRoot = header.ReceiptsRoot
+	result.GasLimit = header.GasLimit.String()
+	result.GasUsed = header.GasUsed.String()
+	// pow
+	result.Bits = header.Bits
+	result.Nonce = header.Nonce
+	ExtraNonce := new(big.Int).SetUint64(header.ExtraNonce)
+	result.ExtraNonce = ExtraNonce.String()
 	result.Hash = block.HeaderHash()
+
 	txs := make([]*TransactionResp, 0)
 	for _, item := range block.Transactions {
 		var txres *TransactionResp
@@ -218,11 +231,28 @@ func coverBlockHeader2Resp(block *xfsgo.Block, dst **BlockHeaderResp) error {
 		*dst = nil
 		return nil
 	}
-	if err := common.Objcopy(block.Header, dst); err != nil {
-		return err
-	}
-	result := *dst
+	result := new(BlockHeaderResp)
+
+	header := block.Header
+	result.Height = header.Height
+	result.Version = header.Version
+	result.HashPrevBlock = header.HashPrevBlock
+	result.Timestamp = header.Timestamp
+	result.Coinbase = header.Coinbase
+	// merkle tree root hash
+	result.StateRoot = header.StateRoot
+	result.TransactionsRoot = header.TransactionsRoot
+	result.ReceiptsRoot = header.ReceiptsRoot
+	result.GasLimit = header.GasLimit.String()
+	result.GasUsed = header.GasUsed.String()
+	// pow
+	result.Bits = header.Bits
+	result.Nonce = header.Nonce
+	ExtraNonce := new(big.Int).SetUint64(header.ExtraNonce)
+	result.ExtraNonce = ExtraNonce.String()
 	result.Hash = block.HeaderHash()
+
+	*dst = result
 	return nil
 }
 
@@ -231,16 +261,14 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 		*dst = nil
 		return nil
 	}
-	if err := common.Objcopy(tx, &dst); err != nil {
-		return err
-	}
-	result := *dst
-	txhash := tx.Hash()
-	result.Hash = txhash
+
+	result := new(TransactionResp)
+
 	from, err := tx.FromAddr()
 	if err != nil {
 		return err
 	}
+
 	datahex := hex.EncodeToString(tx.Data)
 	signhex := hex.EncodeToString(tx.Signature)
 
@@ -250,9 +278,20 @@ func coverTx2Resp(tx *xfsgo.Transaction, dst **TransactionResp) error {
 	if signhex != "" {
 		result.Signature = "0x" + signhex
 	}
+
+	to := tx.To.B58String()
+	txhash := tx.Hash()
 	result.From = from.B58String()
+	result.To = to
+	result.GasLimit = tx.GasLimit.String()
+	result.GasPrice = tx.GasPrice.String()
+	result.Hash = txhash.Hex()
+	result.Value = tx.Value.String()
+	result.Nonce = tx.Nonce
+	*dst = result
 	return nil
 }
+
 func coverReceipt(src *ReceiptResp, dst **ReceiptResp) error {
 	if src == nil {
 		*dst = nil

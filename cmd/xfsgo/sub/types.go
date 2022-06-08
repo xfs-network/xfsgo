@@ -111,7 +111,7 @@ type delPeerArgs struct {
 	Id string `json:"id"`
 }
 
-type getTranByHashArgs struct {
+type getTxByHashArgs struct {
 	Hash string `json:"hash"`
 }
 
