@@ -18,6 +18,7 @@ type nftoken struct {
 	Name            CTypeString                                 `contract:"storage"`
 	Symbol          CTypeString                                 `contract:"storage"`
 	Owners          map[CTypeUint256]CTypeAddress               `contract:"storage"`
+	TokenUris       map[CTypeUint256]CTypeString               `contract:"storage"`
 	Balances        map[CTypeAddress]CTypeUint256               `contract:"storage"`
 	TokenAllowances map[CTypeUint256]CTypeAddress               `contract:"storage"`
 	Allowances      map[CTypeAddress]map[CTypeAddress]CTypeBool `contract:"storage"`
@@ -51,6 +52,7 @@ func (t *nftoken) Create(
 	t.Symbol = symbol
 	t.Balances = make(map[CTypeAddress]CTypeUint256)
 	t.Owners = make(map[CTypeUint256]CTypeAddress)
+	t.TokenUris = make(map[CTypeUint256]CTypeString)
 	t.TokenAllowances = make(map[CTypeUint256]CTypeAddress)
 	t.Allowances = make(map[CTypeAddress]map[CTypeAddress]CTypeBool)
 	return nil
@@ -70,7 +72,7 @@ func (t *nftoken) GetSymbol() CTypeString {
 func (t *nftoken) exists(tokenId CTypeUint256) bool {
 	return requireAddress(t.Owners[tokenId])
 }
-func (t *nftoken) Mint(ctx *ContractContext, address CTypeAddress) CTypeUint256 {
+func (t *nftoken) Mint(ctx *ContractContext, address CTypeAddress, tokenUri CTypeString) CTypeUint256 {
 	if !assertAddress(NewAddress(ctx.caller), t.Creator) {
 		return CTypeUint256{}
 	}
@@ -82,6 +84,7 @@ func (t *nftoken) Mint(ctx *ContractContext, address CTypeAddress) CTypeUint256 
 	newBalance := new(big.Int).Add(oldBalance.BigInt(), big.NewInt(1))
 	t.Balances[address] = NewUint256(newBalance)
 	t.Owners[NewUint256(tokenId)] = address
+    t.TokenUris[NewUint256(tokenId)] = tokenUri
 	t.Counter = NewUint256(tokenId)
 	ctx.logger.Event(&NFTokenTransferEvent{
 		From:    CTypeAddress{},
@@ -95,6 +98,13 @@ func (t *nftoken) BalanceOf(addr CTypeAddress) CTypeUint256 {
 		return CTypeUint256{}
 	}
 	return t.Balances[addr]
+}
+
+func (t *nftoken) TokenUri(tokenId CTypeUint256) CTypeString {
+    if uri, exists := t.TokenUris[tokenId]; exists {
+        return uri
+    }
+    return CTypeString{}
 }
 
 func (t *nftoken) OwnerOf(tokenId CTypeUint256) CTypeAddress {
